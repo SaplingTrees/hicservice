@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from fastapi import HTTPException
 
-TILE_SIZE = 32
+TILE_SIZE = 256
 
 
 class CoolFile:
@@ -32,7 +32,7 @@ class CoolFile:
             with h5py.File(str(filepath), "r") as f:
                 self.is_multires = True
                 resolutions = [int(res) for res in f["resolutions"].keys()]
-                resolutions.sort()
+                resolutions.sort(reverse=True)
                 self.n_levels = len(resolutions)
                 self.resolutions = list(resolutions)
             sizes = []
@@ -68,9 +68,9 @@ class CoolFile:
         # TODO: Probably add some safeguards to ensure that start and end values are in bounds of the matrix...
         # TODO 2: Should check how doing the slicing in this way handles cells with no entries
         #  Should be NaNs, but likely will be 0, in which case i need to use a different access method...
-        return data[start_x:end_x, start_y:end_y]
+        return data[start_y:end_y, start_x:end_x]
 
-    def get_tile(self, level, tile_x, tile_y, balanced=False, pad=False):
+    def get_tile(self, level, tile_x, tile_y, balanced=False, pad=True):
         if level >= self.n_levels:
             raise ValueError(f"Attempted to fetch tile from level out of bounds.")
 
@@ -87,7 +87,7 @@ class CoolFile:
         pad_w = max(0, TILE_SIZE - width)
 
         return np.pad(
-            tile,
+            tile.astype(float),
             ((0, pad_h), (0, pad_w)),
             mode='constant',
             constant_values=np.nan

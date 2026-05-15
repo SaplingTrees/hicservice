@@ -2,6 +2,6 @@ numpy
 pandas
 cooler
 h5py
-fastapi
+fastapi[standard]
 pydantic_settings
 uvicorn

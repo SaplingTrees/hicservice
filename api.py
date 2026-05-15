@@ -14,9 +14,10 @@ def create_api(app, settings, data_manager: DataManager):
 
     @app.get("/info/{identifier}")
     def get_dataset_info(identifier: str):
-        
         return data_manager.get_dataset_info(identifier)
 
+    # Fetch tile data from a given dataset at selected level and tile coordinates
+    # Importantly level zero == lowest detail (smallest total size)
     @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}")
     def get_dataset_sile(identifier: str, level: int, tile_x: int, tile_y: int, test=False):
         dataset = data_manager.get_dataset(identifier)
