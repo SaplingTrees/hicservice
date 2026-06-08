@@ -5,3 +5,5 @@ h5py
 fastapi[standard]
 pydantic_settings
 uvicorn
+networkx
+pydot

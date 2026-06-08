@@ -93,6 +93,12 @@ class CoolFile:
             constant_values=np.nan
         )
 
+    def get_region_pos(self, level, start_x, end_x, start_y, end_y, balanced=False):
+        if level >= self.n_levels:
+            raise ValueError(f"Attempted to fetch tile from level out of bounds.")
+
+        return self.create_tile(level, start_x, end_x + 1, start_y, end_y + 1, balanced)
+
     def get_region(self, level, region_start_x, region_end_x, region_start_y, region_end_y, balanced=False):
         if level >= self.n_levels:
             raise ValueError(f"Attempted to fetch tile from level out of bounds.")
