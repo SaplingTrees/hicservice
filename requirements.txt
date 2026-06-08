@@ -8,3 +8,8 @@ uvicorn
 networkx
 pydot
 scikit-learn
+git+https://github.com/hiclib/pastis.git
+
+# Local patch files for Python 3.12+ compatibility
+./distutils_fix.py
+./distutils_fix.pth

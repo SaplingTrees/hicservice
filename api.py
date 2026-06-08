@@ -2,6 +2,7 @@ from data_manager import DataManager
 from gzip import compress
 from fastapi import Response
 from graph_layouting import compute_graph_layout
+from pastis_reconstruction import reconstruct_3d
 
 def create_api(app, settings, data_manager: DataManager):
     @app.get("/datasets")
@@ -44,5 +45,11 @@ def create_api(app, settings, data_manager: DataManager):
         result = [[key, pos[0], pos[1]] for key, pos in positions.items()]
         return result
 
-
+    @app.get("/reconstruct/{identifier}/level/{level}/type/{type}/position/{start}/{end}")
+    def calculate_reconstruction(identifier: str, level: int, type: str, start: int, end: int):
+        dataset = data_manager.get_dataset(identifier)
+        matrix = dataset.get_region_pos(level, start, end, start, end)
+        positions = reconstruct_3d(matrix, type)
+        print(positions)
+        return positions
 
