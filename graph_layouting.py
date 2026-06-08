@@ -4,6 +4,7 @@ from typing import Optional
 
 import networkx as nx;
 from networkx.drawing.nx_pydot import graphviz_layout
+from sklearn.manifold import MDS
 
 def distance_function(frequency: float) -> float:
     return 1 / cbrt(frequency)
@@ -76,8 +77,33 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
         case "forceatlas2":
             result = nx.forceatlas2_layout(G, weight='distance')
             return {node: pos.tolist() for node, pos in result.items()}
-        # Stresful is Stress majori
+        # Stresful is Stress majorization
         case "stressful":
             return graphviz_layout(G, prog="neato")
+        case "mds":
+            return compute_mds(G)
         case _:
             raise ValueError("Layout type " + type + " is not supported.")
+        
+
+def compute_mds(G):
+    nodes = list(G.nodes())
+    n = len(nodes)
+
+    index = {node: i for i, node in enumerate(nodes)}
+
+    D = np.full((n, n), np.inf)
+    np.fill_diagonal(D, 0)
+    for u, v, data in G.edges(data=True):
+        i, j = index[u], index[v]
+        D[i, j] = data.get("distance", 1.0)
+        D[j, i] = D[i, j]
+    mds = MDS(
+        n_components=2,
+        metric="precomputed",
+        random_state=42,
+        init="classical_mds"
+    )
+
+    pos_array = mds.fit_transform(D)
+    return {nodes[i]: pos_array[i] for i in range(n)}

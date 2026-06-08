@@ -7,3 +7,4 @@ pydantic_settings
 uvicorn
 networkx
 pydot
+scikit-learn
