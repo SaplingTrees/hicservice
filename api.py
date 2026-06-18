@@ -18,10 +18,10 @@ def create_api(app, settings, data_manager: DataManager):
 
     # Fetch tile data from a given dataset at selected level and tile coordinates
     # Importantly level zero == lowest detail (smallest total size)
-    @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}")
-    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, test=False):
+    @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}/balanced/{balanced}")
+    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False):
         dataset = data_manager.get_dataset(identifier)
-        tile = dataset.get_tile(level, tile_x, tile_y)
+        tile = dataset.get_tile(level, tile_x, tile_y, balanced)
         print(tile)
         if test:
             return {"matrix": tile.tolist()}
@@ -35,10 +35,10 @@ def create_api(app, settings, data_manager: DataManager):
             }
         )
     
-    @app.get("/data/{identifier}/level/{level}/xregion/{start_x}/{end_x}/yregion/{start_y}/{end_y}")
-    def get_dataset_section(identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, test=False):
+    @app.get("/data/{identifier}/level/{level}/xregion/{start_x}/{end_x}/yregion/{start_y}/{end_y}/balanced/{balanced}")
+    def get_dataset_section(identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, balanced: bool, test=False):
         dataset = data_manager.get_dataset(identifier)
-        tile = dataset.get_region_pos(level, start_x, end_x, start_y, end_y)
+        tile = dataset.get_region_pos(level, start_x, end_x, start_y, end_y, balanced)
         print(tile)
         if test:
             return {"matrix": tile.tolist()}

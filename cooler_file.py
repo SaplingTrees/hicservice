@@ -64,6 +64,9 @@ class CoolFile:
 
     def create_tile(self, level, start_x, end_x, start_y, end_y, balanced=False):
         c = self.open_cooler(level)
+        
+        if balanced and not 'weight' in c.bins().columns:
+            cooler.balance_cooler(c, store=True)
         data = c.matrix(balance=balanced)
         # TODO: Probably add some safeguards to ensure that start and end values are in bounds of the matrix...
         # TODO 2: Should check how doing the slicing in this way handles cells with no entries
