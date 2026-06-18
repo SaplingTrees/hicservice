@@ -19,10 +19,10 @@ def create_api(app, settings, data_manager: DataManager):
 
     # Fetch tile data from a given dataset at selected level and tile coordinates
     # Importantly level zero == lowest detail (smallest total size)
-    @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}")
-    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, test=False):
+    @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}/balanced/{balanced}")
+    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False):
         dataset = data_manager.get_dataset(identifier)
-        tile = dataset.get_tile(level, tile_x, tile_y)
+        tile = dataset.get_tile(level, tile_x, tile_y, balanced)
         print(tile)
         if test:
             return {"matrix": tile.tolist()}
@@ -36,10 +36,10 @@ def create_api(app, settings, data_manager: DataManager):
             }
         )
     
-    @app.get("/data/{identifier}/level/{level}/xregion/{start_x}/{end_x}/yregion/{start_y}/{end_y}")
-    def get_dataset_section(identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, test=False):
+    @app.get("/data/{identifier}/level/{level}/xregion/{start_x}/{end_x}/yregion/{start_y}/{end_y}/balanced/{balanced}")
+    def get_dataset_section(identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, balanced: bool, test=False):
         dataset = data_manager.get_dataset(identifier)
-        tile = dataset.get_region_pos(level, start_x, end_x, start_y, end_y)
+        tile = dataset.get_region_pos(level, start_x, end_x, start_y, end_y, balanced)
         print(tile)
         if test:
             return {"matrix": tile.tolist()}
@@ -53,17 +53,17 @@ def create_api(app, settings, data_manager: DataManager):
             }
         )
     
-    @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}")
-    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int):
+    @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
+    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool):
         dataset = data_manager.get_dataset(identifier)
-        matrix = dataset.get_region_pos(level, start, end, start, end)
+        matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
         positions = compute_graph_layout(matrix, type, False)
         result = [[key, pos[0], pos[1]] for key, pos in positions.items()]
         return result
 
-    @app.get("/reconstruct/{identifier}/level/{level}/type/{type}/position/{start}/{end}")
-    def calculate_reconstruction(identifier: str, level: int, type: str, start: int, end: int):
+    @app.get("/reconstruct/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
+    def calculate_reconstruction(identifier: str, level: int, type: str, start: int, end: int, balanced: bool):
         dataset = data_manager.get_dataset(identifier)
-        matrix = dataset.get_region_pos(level, start, end, start, end)
+        matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
         return reconstruct_3d(matrix, type)
 
