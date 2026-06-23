@@ -4,6 +4,8 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import HTTPException
+import math
+
 
 TILE_SIZE = 256
 
@@ -52,6 +54,11 @@ class CoolFile:
             "sizes": self.sizes,
             "tile_size": TILE_SIZE
         }
+
+    def get_chromosome_annotations(self, level: int = 0, round: bool = False):
+        c = self.open_cooler(level)
+        res = self.resolutions[level]
+        return [(chromosome, size if not round else math.ceil(size / res) * res) for chromosome, size in c.chromsizes.items()]
 
     def open_cooler(self, level):
         if level >= self.n_levels:

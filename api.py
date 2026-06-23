@@ -53,6 +53,22 @@ def create_api(app, settings, data_manager: DataManager):
             }
         )
     
+    @app.get("/chromosomes/{identifier}")
+    def fetch_chromosome_annotations(identifier: str, level: int = 0, round: bool = False):
+        dataset = data_manager.get_dataset(identifier)
+
+        chrom_sizes = dataset.get_chromosome_annotations(level, round);
+        res = dataset.resolutions[level]
+        result = []
+        total = 0
+
+        for i, (name, size) in enumerate(chrom_sizes):
+            start = total if i == 0 else total + res
+            end = total + size
+            result.append((name, start, end))
+            total = end
+        return result
+
     @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
     def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool):
         dataset = data_manager.get_dataset(identifier)
