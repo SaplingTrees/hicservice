@@ -70,6 +70,10 @@ class CoolFile:
             return cooler.Cooler(str(self.filepath))
 
     def create_tile(self, level, start_x, end_x, start_y, end_y, balanced=False):
+        size = self.sizes[level]
+        if start_x > size or start_y > size:
+            raise ValueError(f"Tile coordinates out of range.")
+
         c = self.open_cooler(level)
         
         if balanced and not 'weight' in c.bins().columns:
@@ -78,7 +82,9 @@ class CoolFile:
         # TODO: Probably add some safeguards to ensure that start and end values are in bounds of the matrix...
         # TODO 2: Should check how doing the slicing in this way handles cells with no entries
         #  Should be NaNs, but likely will be 0, in which case i need to use a different access method...
-        return data[start_y:end_y, start_x:end_x]
+        slice = data[start_y:min(end_y, size), start_x:min(end_x, size)]
+        cleaned = np.nan_to_num(slice, nan=-1)
+        return cleaned
 
     def get_tile(self, level, tile_x, tile_y, balanced=False, pad=True):
         if level >= self.n_levels:
@@ -100,7 +106,7 @@ class CoolFile:
             tile.astype(float),
             ((0, pad_h), (0, pad_w)),
             mode='constant',
-            constant_values=np.nan
+            constant_values=-1
         )
 
     def get_region_pos(self, level, start_x, end_x, start_y, end_y, balanced=False):
