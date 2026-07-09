@@ -20,7 +20,7 @@ def create_api(app, settings, data_manager: DataManager):
     # Fetch tile data from a given dataset at selected level and tile coordinates
     # Importantly level zero == lowest detail (smallest total size)
     @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}/balanced/{balanced}")
-    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False):
+    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False):        
         dataset = data_manager.get_dataset(identifier)
         tile = dataset.get_tile(level, tile_x, tile_y, balanced)
         print(tile)
@@ -70,10 +70,10 @@ def create_api(app, settings, data_manager: DataManager):
         return result
 
     @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
-    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool):
+    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0):
         dataset = data_manager.get_dataset(identifier)
         matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
-        positions = compute_graph_layout(matrix, type, False)
+        positions = compute_graph_layout(matrix, type, False, infer_distances=infer_distances, freq_filter=freq_filter)
         result = [[key, pos[0], pos[1]] for key, pos in positions.items()]
         return result
 
