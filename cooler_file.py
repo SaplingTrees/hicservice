@@ -17,6 +17,7 @@ class CoolFile:
     n_levels = 1
     resolutions = []
     sizes = []
+    chromosomes = {}
 
     def __init__(self, path: Path):
         self.filepath = path
@@ -27,9 +28,12 @@ class CoolFile:
         if cooler.fileops.is_cooler(str(filepath)) and filepath.suffix != ".mcool":
             self.is_multires = False
             self.n_levels = 1
-            info = cooler.Cooler(str(filepath)).info
+            c: cooler.Cooler = cooler.Cooler(str(filepath))
+            info = c.info
             self.resolutions = [info['bin-size']]
             self.sizes = [info['nbins']]
+            chromosomes = c.chroms()[:]
+            self.chromosomes = dict(zip(chromosomes["name"], chromosomes["length"]))
         else:
             with h5py.File(str(filepath), "r") as f:
                 self.is_multires = True
@@ -42,6 +46,9 @@ class CoolFile:
                 c: cooler.Cooler = cooler.Cooler(str(filepath) + "::/resolutions/" + str(resolution))
                 sizes.append(int(c.info['nbins']))
             self.sizes = sizes
+            c: cooler.Cooler = cooler.Cooler(str(filepath) + "::/resolutions/" + str(self.resolutions[0]))
+            chromosomes = c.chroms()[:]
+            self.chromosomes = dict(zip(chromosomes["name"], chromosomes["length"]))
 
     def get_identifier(self):
         return self.name
@@ -52,6 +59,7 @@ class CoolFile:
             "levels": self.n_levels,
             "resolutions": self.resolutions,
             "sizes": self.sizes,
+            "chromosomes": self.chromosomes,
             "tile_size": TILE_SIZE
         }
 

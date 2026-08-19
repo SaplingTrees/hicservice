@@ -15,7 +15,7 @@ def frequency_filter(frequency: float, threshold: float) -> bool:
 def distance_filter(distance: float, threshold: Optional[float]) -> bool:
     return threshold is None or distance > threshold
 
-def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq_filter=0, dist_filter=None, mod_distance=1, mod_weight=2):
+def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq_filter=0.0, dist_filter=None, mod_distance=1, mod_weight=2):
     G = nx.Graph()
     measured_distances = {}
     kamada_distances = {}
