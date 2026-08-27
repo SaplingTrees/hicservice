@@ -9,13 +9,17 @@ from sklearn.manifold import MDS
 def distance_function(frequency: float) -> float:
     return 1 / cbrt(frequency)
 
+# Returns TRUE is frequency IS filtered
 def frequency_filter(frequency: float, threshold: float) -> bool:
-    return not np.isnan(frequency) and frequency > threshold
+    return np.isnan(frequency) or frequency <= threshold
 
+# Returns TRUE is distance IS filtered
 def distance_filter(distance: float, threshold: Optional[float]) -> bool:
-    return threshold is None or distance > threshold
+    return threshold is not None and distance >= threshold
 
 def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq_filter=0.0, dist_filter=None, mod_distance=1, mod_weight=2):
+    print("Freq:", freq_filter, "Dist:", dist_filter, "Weight:", mod_weight)
+
     G = nx.Graph()
     measured_distances = {}
     kamada_distances = {}
@@ -25,11 +29,11 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
         for j in range(i + 1, n):
             frequency = matrix[i, j]
 
-            if not frequency_filter(frequency, freq_filter):
+            if frequency_filter(frequency, freq_filter):
                 continue
             distance = distance_function(frequency)
             
-            if not distance_filter(distance, dist_filter):
+            if distance_filter(distance, dist_filter):
                 continue
             G.add_node(i)
             G.add_node(j)

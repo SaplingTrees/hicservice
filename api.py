@@ -70,10 +70,10 @@ def create_api(app, settings, data_manager: DataManager):
         return result
 
     @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
-    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0):
+    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = None, close_weight: float = 3):
         dataset = data_manager.get_dataset(identifier)
         matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
-        positions = compute_graph_layout(matrix, type, infer_distances=infer_distances, freq_filter=freq_filter)
+        positions = compute_graph_layout(matrix, type, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=dist_filter, mod_weight=close_weight)
         result = [[key, pos[0], pos[1]] for key, pos in positions.items()]
         return result
 
