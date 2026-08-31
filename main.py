@@ -7,8 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from settings import Settings
 from api import create_api
 from data_manager import DataManager
+from data_store import ReconstructionDataStore
 
-settings = Settings()
+settings: Settings = Settings()
 
 app = FastAPI()
 app.add_middleware(
@@ -20,8 +21,9 @@ app.add_middleware(
 )
 
 data_manager = DataManager(settings)
+storage_manager = ReconstructionDataStore(settings)
 
-create_api(app, settings, data_manager)
+create_api(app, settings, data_manager, storage_manager)
 
 
 # Run by using fastapi dev in the python env terminal

@@ -1,10 +1,12 @@
 from data_manager import DataManager
+from data_store import ReconstructionDataStore
+from settings import Settings
 from gzip import compress
 from fastapi import Response
 from graph_layouting import compute_graph_layout
 from pastis_reconstruction import reconstruct_3d
 
-def create_api(app, settings, data_manager: DataManager):
+def create_api(app, settings: Settings, data_manager: DataManager, storage_manager: ReconstructionDataStore):
     @app.get("/datasets")
     def fetch_datasets():
         return data_manager.get_dataset_ids()
@@ -70,16 +72,27 @@ def create_api(app, settings, data_manager: DataManager):
         return result
 
     @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
-    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = None, close_weight: float = 3):
+    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: int = 3):
+        if settings.use_storage and storage_manager.graph_exists(identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight):
+            return storage_manager.load_graph(identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight)
+
         dataset = data_manager.get_dataset(identifier)
         matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
-        positions = compute_graph_layout(matrix, type, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=dist_filter, mod_weight=close_weight)
+        positions = compute_graph_layout(matrix, type, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=(None if dist_filter <= 0 else dist_filter), mod_weight=close_weight)
         result = [[key, pos[0], pos[1]] for key, pos in positions.items()]
+        if (settings.use_storage):
+            storage_manager.store_graph(result, identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight)
         return result
 
     @app.get("/reconstruct/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
     def calculate_reconstruction(identifier: str, level: int, type: str, start: int, end: int, balanced: bool):
+        if settings.use_storage and storage_manager.reconstruction_exists(identifier, level, type, start, end, balanced):
+            return storage_manager.load_reconstruction(identifier, level, type, start, end, balanced)
+
         dataset = data_manager.get_dataset(identifier)
         matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
-        return reconstruct_3d(matrix, type)
+        reconstruction = reconstruct_3d(matrix, type)
+        if (settings.use_storage):
+            storage_manager.store_reconstruction(reconstruction, identifier, level, type, start, end, balanced)
+        return reconstruction
 

@@ -4,7 +4,7 @@ from pastis.optimization.poisson_structure import estimate_X as poisson_estimate
 
 import numpy as np
 
-def reconstruct_3d(matrix: np.array, type: str) -> np.ndarray:
+def reconstruct_3d(matrix: np.array, type: str) -> list[list[float]]:
     match type:
         case "mds":
             return mds_estimate_X(matrix, random_state=42).tolist()
