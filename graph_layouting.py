@@ -118,5 +118,5 @@ def compute_mds(G):
         random_state=42
     )
 
-    pos_array = mds.fit_transform(D)
+    pos_array = mds.fit_transform(distances)
     return {nodes[i]: pos_array[i] for i in range(n)}
