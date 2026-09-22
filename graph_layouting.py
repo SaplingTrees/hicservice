@@ -95,20 +95,29 @@ def compute_mds(G):
     nodes = list(G.nodes())
     n = len(nodes)
 
-    index = {node: i for i, node in enumerate(nodes)}
+    distances = np.full((n, n), np.inf)
+    np.fill_diagonal(distances, 0)
 
-    D = np.full((n, n), np.inf)
-    np.fill_diagonal(D, 0)
-    for u, v, data in G.edges(data=True):
-        i, j = index[u], index[v]
-        D[i, j] = data.get("distance", 1.0)
-        D[j, i] = D[i, j]
+    # Fill in finite shortest-path distances
+    lengths = dict(nx.all_pairs_dijkstra_path_length(G, weight="distance"))
+    node_to_i = {node: i for i, node in enumerate(nodes)}
+
+    for u, targets in lengths.items():
+        for v, d in targets.items():
+            distances[node_to_i[u], node_to_i[v]] = d
+
+    max_distance = np.max(distances[np.isfinite(distances)])
+    for i, u in enumerate(nodes):
+        for j, v in enumerate(nodes):
+            if np.isinf(distances[i, j]):
+                distances[i, j] = 1.2 * max_distance * (abs(u - v) / n)
+
     mds = MDS(
         n_components=2,
         metric="precomputed",
-        random_state=42,
-        init="classical_mds"
+        init="classical_mds",
+        random_state=42
     )
 
-    pos_array = mds.fit_transform(D)
+    pos_array = mds.fit_transform(distances)
     return {nodes[i]: pos_array[i] for i in range(n)}
