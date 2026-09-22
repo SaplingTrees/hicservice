@@ -40,6 +40,7 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
 
             if abs(j - i) <= mod_distance:
                 distance /= mod_weight
+                frequency *= mod_weight
             G.add_edge(i, j, weight=frequency, distance=distance, neighbouring=(i + 1 == j), len=distance)
             bin1dict = measured_distances.setdefault(i, {})
             bin1dict[j] = distance
@@ -77,7 +78,7 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
             return nx.kamada_kawai_layout(G, dist=kamada_distances, weight='distance')
         # Spring is Frucherman Reingold
         case "spring":
-            return nx.spring_layout(G)
+            return nx.spring_layout(G, seed=42)
         case "forceatlas2":
             result = nx.forceatlas2_layout(G, weight='distance')
             return {node: pos.tolist() for node, pos in result.items()}

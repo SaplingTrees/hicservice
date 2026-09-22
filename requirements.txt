@@ -7,6 +7,7 @@ pydantic_settings
 uvicorn
 networkx
 pydot
+scipy<1.18
 scikit-learn
 iced
 git+https://github.com/hiclib/pastis.git
