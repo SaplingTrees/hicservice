@@ -64,14 +64,14 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
                 if v in dist[u]:
                     shortest = dist[u][v]
 
-                    if not distance_filter(shortest, dist_filter):
+                    if distance_filter(shortest, dist_filter):
                         continue
-                    bin1dict = kamada_distances.setdefault(i, {i : 0})
-                    bin1dict[j] = shortest
-                    bin2dict = kamada_distances.setdefault(j, {j : 0})
-                    bin2dict[i] = shortest
+                    bin1dict = kamada_distances.setdefault(u, {u : 0})
+                    bin1dict[v] = shortest
+                    bin2dict = kamada_distances.setdefault(v, {v : 0})
+                    bin2dict[u] = shortest
                     # Add new edge with computed distance
-                    G.add_edge(u, v, distance=shortest, weight=shortest ** 3, len=shortest, neighbouring=(u + 1 == v or v + 1 == u))
+                    G.add_edge(u, v, distance=(shortest), weight=shortest ** 3, len=shortest, neighbouring=(u + 1 == v or v + 1 == u))
 
     match type:
         case "kamada":
