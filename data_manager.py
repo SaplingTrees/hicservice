@@ -7,26 +7,52 @@ from cooler_file import CoolFile
 class DataManager:
     data_dir = ""
     datasets: dict[str, CoolFile] = dict()
+    dataset_groups: dict[str, str] = dict()
+    groups: list[str] = []
 
     def __init__(self, settings):
         self.data_dir = settings.data_dir
         self.fetch_datasets()
 
     def fetch_datasets(self):
+        dataset_groups_temp = dict()
+        for file in Path(self.data_dir).iterdir():
+            filename = file.name.lower()
+            if not file.is_file() or not filename.endswith(".txt"):
+                continue
+            group = filename.split(".")[0]
+            self.groups.append(group)
+            
+            for line in file.read_text(encoding="utf-8", errors="ignore").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                dataset_groups_temp[line.lower()] = group
+        
         for file in Path(self.data_dir).iterdir():
             filename = file.name
             if filename.endswith(".cool") or filename.endswith(".mcool"):
                 dataset = CoolFile(file)
+                dataset_name = filename.lower().split(".")[0]
+                if (dataset_groups_temp.get(dataset_name)):
+                    self.dataset_groups[dataset.get_identifier()] = dataset_groups_temp[dataset_name]
                 self.datasets[dataset.get_identifier()] = dataset
+        print(self.dataset_groups)
 
-    def get_dataset_ids(self):
-        return list(self.datasets.keys())
+    def is_visible(self, identifier: str, group: str | None) -> bool:
+        dataset_group = self.dataset_groups.get(identifier)
+        return dataset_group is None or dataset_group == group
 
-    def get_dataset(self, identifier):
-        return self.datasets[identifier]
+    def get_dataset_ids(self, group: str | None = None):
+        return [identifier for identifier in self.datasets if self.is_visible(identifier, group)]
 
-    def get_dataset_info(self, identifier):
-        dataset = self.datasets[identifier]
+    def get_dataset(self, identifier: str, group: str | None = None):
+        dataset = self.datasets.get(identifier)
         if dataset is None:
             raise HTTPException(status_code=404, detail=f"Dataset with identifier {identifier} not found.")
-        return dataset.get_info()
+        if not self.is_visible(identifier, group):
+            raise HTTPException(status_code=403, detail=f"Dataset with identifier {identifier} is not available for group {group}.")
+        return dataset
+
+    def get_dataset_info(self, identifier: str, group: str | None = None):
+        return self.get_dataset(identifier, group).get_info()
