@@ -1,6 +1,7 @@
 import cooler
 import h5py
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 from fastapi import HTTPException
@@ -37,7 +38,7 @@ class CoolFile:
         else:
             with h5py.File(str(filepath), "r") as f:
                 self.is_multires = True
-                resolutions = [int(res) for res in f["resolutions"].keys()]
+                resolutions = [int(res) for res in cast(h5py.Group, f["resolutions"]).keys()]
                 resolutions.sort(reverse=True)
                 self.n_levels = len(resolutions)
                 self.resolutions = list(resolutions)
