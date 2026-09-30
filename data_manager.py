@@ -8,11 +8,30 @@ class DataManager:
     data_dir = ""
     datasets: dict[str, CoolFile] = dict()
     dataset_groups: dict[str, str] = dict()
-    groups: list[str] = []
+    groups: list[tuple[str, str]] = []
 
     def __init__(self, settings):
         self.data_dir = settings.data_dir
+        self.load_groups()
         self.fetch_datasets()
+
+    def load_groups(self):
+        groups_file = Path(__file__).parent / "groups.txt"
+        if not groups_file.is_file():
+            return
+        for line in groups_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) > 1:
+                self.groups.append((parts[0], parts[1]))
+
+    def get_group_from_pw(self, password):
+        for group, group_password in self.groups:
+            if password == group_password:
+                return group
+        return None
 
     def fetch_datasets(self):
         dataset_groups_temp = dict()
@@ -21,7 +40,8 @@ class DataManager:
             if not file.is_file() or not filename.endswith(".txt"):
                 continue
             group = filename.split(".")[0]
-            self.groups.append(group)
+            if group not in [group[0] for group in self.groups]:
+                continue
             
             for line in file.read_text(encoding="utf-8", errors="ignore").splitlines():
                 line = line.strip()

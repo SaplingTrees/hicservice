@@ -2,11 +2,19 @@ from data_manager import DataManager
 from data_store import ReconstructionDataStore
 from settings import Settings
 from gzip import compress
-from fastapi import Response
+from fastapi import Response, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from graph_layouting import compute_graph_layout
 from pastis_reconstruction import reconstruct_3d
 
 def create_api(app, settings: Settings, data_manager: DataManager, storage_manager: ReconstructionDataStore):
+    security = HTTPBearer(auto_error=False)
+
+    def authenticate(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        if credentials is None:
+            return None
+        return data_manager.get_group_from_pw(credentials.credentials)
+    
     @app.get("/datasets")
     def fetch_datasets():
         return data_manager.get_dataset_ids()
@@ -16,14 +24,14 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         return "TODO"
 
     @app.get("/info/{identifier}")
-    def get_dataset_info(identifier: str):
-        return data_manager.get_dataset_info(identifier)
+    def get_dataset_info(identifier: str, group=Depends(authenticate)):
+        return data_manager.get_dataset_info(identifier, group)
 
     # Fetch tile data from a given dataset at selected level and tile coordinates
     # Importantly level zero == lowest detail (smallest total size)
     @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}/balanced/{balanced}")
-    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False):        
-        dataset = data_manager.get_dataset(identifier)
+    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False, group=Depends(authenticate)):        
+        dataset = data_manager.get_dataset(identifier, group)
         tile = dataset.get_tile(level, tile_x, tile_y, balanced)
         print(tile)
         if test:
@@ -39,8 +47,8 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         )
     
     @app.get("/data/{identifier}/level/{level}/xregion/{start_x}/{end_x}/yregion/{start_y}/{end_y}/balanced/{balanced}")
-    def get_dataset_section(identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, balanced: bool, test=False):
-        dataset = data_manager.get_dataset(identifier)
+    def get_dataset_section(identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, balanced: bool, test=False, group=Depends(authenticate)):
+        dataset = data_manager.get_dataset(identifier, group)
         tile = dataset.get_region_pos(level, start_x, end_x, start_y, end_y, balanced)
         print(tile)
         if test:
@@ -56,8 +64,8 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         )
     
     @app.get("/chromosomes/{identifier}")
-    def fetch_chromosome_annotations(identifier: str, level: int = 0, round: bool = False):
-        dataset = data_manager.get_dataset(identifier)
+    def fetch_chromosome_annotations(identifier: str, level: int = 0, round: bool = False, group=Depends(authenticate)):
+        dataset = data_manager.get_dataset(identifier, group)
 
         chrom_sizes = dataset.get_chromosome_annotations(level, round);
         res = dataset.resolutions[level]
@@ -72,11 +80,11 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         return result
 
     @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
-    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: int = 3):
+    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: int = 3, group=Depends(authenticate)):
+        dataset = data_manager.get_dataset(identifier, group)
         if settings.use_storage and storage_manager.graph_exists(identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight):
             return storage_manager.load_graph(identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight)
 
-        dataset = data_manager.get_dataset(identifier)
         matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
         positions = compute_graph_layout(matrix, type, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=(None if dist_filter <= 0 else dist_filter), mod_weight=close_weight)
         result = [[key, pos[0], pos[1]] for key, pos in positions.items()]
@@ -85,11 +93,11 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         return result
 
     @app.get("/reconstruct/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
-    def calculate_reconstruction(identifier: str, level: int, type: str, start: int, end: int, balanced: bool):
+    def calculate_reconstruction(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, group=Depends(authenticate)):
+        dataset = data_manager.get_dataset(identifier, group)
         if settings.use_storage and storage_manager.reconstruction_exists(identifier, level, type, start, end, balanced):
             return storage_manager.load_reconstruction(identifier, level, type, start, end, balanced)
 
-        dataset = data_manager.get_dataset(identifier)
         matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
         reconstruction = reconstruct_3d(matrix, type)
         if (settings.use_storage):
