@@ -25,7 +25,8 @@ class DataManager:
                 continue
             parts = line.split()
             if len(parts) > 1:
-                self.groups.append((parts[0], parts[1]))
+                self.groups.append((parts[0].lower(), parts[1]))
+        print(self.groups)
 
     def get_group_from_pw(self, password):
         for group, group_password in self.groups:
@@ -40,6 +41,7 @@ class DataManager:
             if not file.is_file() or not filename.endswith(".txt"):
                 continue
             group = filename.split(".")[0]
+            print("Group:", group)
             if group not in [group[0] for group in self.groups]:
                 continue
             

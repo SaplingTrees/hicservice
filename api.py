@@ -2,7 +2,7 @@ from data_manager import DataManager
 from data_store import ReconstructionDataStore
 from settings import Settings
 from gzip import compress
-from fastapi import Response, Depends
+from fastapi import Response, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from graph_layouting import compute_graph_layout
 from pastis_reconstruction import reconstruct_3d
@@ -15,9 +15,22 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
             return None
         return data_manager.get_group_from_pw(credentials.credentials)
     
+    # The gate screen in the frontend asks this before letting the user in, so it can tell a
+    # wrong passcode apart from a server that is simply down. 401 means no passcode was sent,
+    # 403 that one was sent but matches no group; anonymous callers use the other endpoints
+    # without ever hitting this one, so both are errors here rather than "public access".
+    @app.get("/auth")
+    def check_passcode(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+        if credentials is None:
+            raise HTTPException(status_code=401, detail="No passcode provided.")
+        group = data_manager.get_group_from_pw(credentials.credentials)
+        if group is None:
+            raise HTTPException(status_code=403, detail="Unrecognised passcode.")
+        return {"group": group}
+
     @app.get("/datasets")
-    def fetch_datasets():
-        return data_manager.get_dataset_ids()
+    def fetch_datasets(group=Depends(authenticate)):
+        return data_manager.get_dataset_ids(group)
 
     @app.get("/")
     def help():
