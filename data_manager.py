@@ -34,6 +34,31 @@ class DataManager:
                 return group
         return None
 
+    def free_upload_path(self, stem: str, suffix: str) -> Path:
+        target_dir = Path(self.data_dir).resolve()
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        base, counter = stem, 1
+        while True:
+            target = (target_dir / f"{base}{suffix}").resolve()
+            if target.parent != target_dir:
+                raise HTTPException(status_code=400, detail="The uploaded file name is not usable.")
+            if base not in self.datasets and not target.exists():
+                return target
+            counter += 1
+            base = f"{stem}_{counter}"
+
+    def register(self, filepath: Path, group: str | None = None):
+        try:
+            dataset = CoolFile(filepath)
+        except Exception as error:
+            filepath.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail=f"The uploaded file could not be read as a Hi-C cooler file: {error}")
+        self.datasets[dataset.get_identifier()] = dataset
+        if group is not None:
+            self.dataset_groups[dataset.get_identifier()] = group
+        return dataset
+
     def fetch_datasets(self):
         dataset_groups_temp = dict()
         for file in Path(self.data_dir).iterdir():

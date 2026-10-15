@@ -1,8 +1,11 @@
+from pathlib import Path
+from uuid import uuid4
+
 from data_manager import DataManager
 from data_store import ReconstructionDataStore
 from settings import Settings
 from gzip import compress
-from fastapi import Response, Depends, HTTPException
+from fastapi import Response, Depends, HTTPException, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from graph_layouting import compute_graph_layout
 from pastis_reconstruction import reconstruct_3d
@@ -39,6 +42,35 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
     @app.get("/info/{identifier}")
     def get_dataset_info(identifier: str, group=Depends(authenticate)):
         return data_manager.get_dataset_info(identifier, group)
+
+    @app.post("/upload")
+    async def upload_dataset(file: UploadFile = File(...), group=Depends(authenticate)):
+        if not settings.allow_uploads:
+            raise HTTPException(status_code=403, detail="Uploads are disabled on this server.")
+
+        name = Path((file.filename or "").replace("\\", "/")).name.replace("\x00", "").strip()
+        stem, suffix = Path(name).stem, Path(name).suffix.lower()
+        if not stem or suffix not in (".cool", ".mcool"):
+            raise HTTPException(status_code=400, detail="Only .cool and .mcool files can be uploaded.")
+
+        staging = Path(f"{data_manager.data_dir}/.upload-{uuid4().hex}.part")
+        written = 0
+        try:
+            with staging.open("wb") as out:
+                while chunk := await file.read(1024 * 1024):
+                    written += len(chunk)
+                    out.write(chunk)
+        except BaseException:
+            staging.unlink(missing_ok=True)
+            raise
+        finally:
+            await file.close()
+
+        target = data_manager.free_upload_path(stem, suffix)
+        staging.replace(target)
+        dataset = data_manager.register(target, group)
+
+        return {"identifier": dataset.get_identifier(), "info": dataset.get_info()}
 
     # Fetch tile data from a given dataset at selected level and tile coordinates
     # Importantly level zero == lowest detail (smallest total size)
