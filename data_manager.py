@@ -51,6 +51,7 @@ class DataManager:
     def register(self, filepath: Path, group: str | None = None):
         try:
             dataset = CoolFile(filepath)
+            dataset.verify()
         except Exception as error:
             filepath.unlink(missing_ok=True)
             raise HTTPException(status_code=400, detail=f"The uploaded file could not be read as a Hi-C cooler file: {error}")

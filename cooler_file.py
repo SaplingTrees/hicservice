@@ -64,6 +64,10 @@ class CoolFile:
             "tile_size": TILE_SIZE
         }
 
+    def verify(self):
+        for level in range(self.n_levels):
+            self.get_region_pos(level, 0, 16, 0, 16, balanced=False)
+
     def get_chromosome_annotations(self, level: int = 0, round: bool = False):
         c = self.open_cooler(level)
         res = self.resolutions[level]
