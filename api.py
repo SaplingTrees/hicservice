@@ -1,16 +1,32 @@
 from pathlib import Path
-from uuid import uuid4
 
 from data_manager import DataManager
 from data_store import ReconstructionDataStore
 from settings import Settings
 from gzip import compress
-from fastapi import Response, Depends, HTTPException, UploadFile, File
+from fastapi import Response, Depends, HTTPException, Request, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from graph_layouting import compute_graph_layout
 from pastis_reconstruction import reconstruct_3d
+from upload_security import (
+    assert_stored_outside_webroot,
+    check_declared_size,
+    check_upload_request,
+    discard_stale_uploads,
+    safe_upload_name,
+    scan,
+    staging_path,
+    store_upload,
+)
 
 def create_api(app, settings: Settings, data_manager: DataManager, storage_manager: ReconstructionDataStore):
+    # Fail here rather than at the first upload: files landing in a folder the app also serves
+    # to browsers is the one mistake this cannot be undone by deleting a file later.
+    assert_stored_outside_webroot(app, [settings.data_dir, settings.temp_data_dir])
+    # Nothing of ours is mid-transfer yet, so every staging file here belongs to an upload that
+    # stopped when the process did.
+    discard_stale_uploads([settings.data_dir, settings.temp_data_dir])
+
     security = HTTPBearer(auto_error=False)
 
     def authenticate(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
@@ -45,34 +61,43 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
 
     @app.post("/upload")
     async def upload_dataset(
+        request: Request,
         file: UploadFile = File(...),
         temporary: bool = True,
         group=Depends(authenticate),
     ):
         if not settings.allow_uploads:
             raise HTTPException(status_code=403, detail="Uploads are disabled on this server.")
-        
-        name = Path((file.filename or "").replace("\\", "/")).name.replace("\x00", "").strip()
-        stem, suffix = Path(name).stem, Path(name).suffix.lower()
-        if not stem or suffix not in (".cool", ".mcool"):
-            raise HTTPException(status_code=400, detail="Only .cool and .mcool files can be uploaded.")
+
+        check_upload_request(request, settings.allowed_origin_patterns)
+
+        # Sanitised and length-checked before the extension is read, so the extension that gets
+        # approved is the one belonging to the name that will actually be stored.
+        stem, suffix = safe_upload_name(file.filename, settings.max_filename_length)
+        max_bytes = settings.max_upload_mb * 1024 * 1024
+        check_declared_size(request.headers.get("content-length"), max_bytes)
 
         staging_dir = settings.temp_data_dir if temporary else settings.data_dir
-        staging = Path(f"{staging_dir}/.upload-{uuid4().hex}.part")
-        written = 0
+        Path(staging_dir).mkdir(parents=True, exist_ok=True)
+        staging = staging_path(staging_dir)
         try:
-            with staging.open("wb") as out:
-                while chunk := await file.read(1024 * 1024):
-                    written += len(chunk)
-                    out.write(chunk)
+            # Counted and sniffed while it arrives rather than afterwards, so an oversized or
+            # mislabelled file costs one chunk of transfer instead of the whole thing.
+            await store_upload(file, staging, max_bytes)
+            if settings.clamd_host or settings.clamd_socket:
+                await scan(staging, settings.clamd_host, settings.clamd_port, settings.clamd_socket, settings.scan_timeout_seconds)
         except BaseException:
             staging.unlink(missing_ok=True)
             raise
         finally:
             await file.close()
 
-        target = data_manager.find_free_filename(stem, suffix, temporary)
-        staging.replace(target)
+        try:
+            target = data_manager.find_free_filename(stem, suffix, temporary)
+            staging.replace(target)
+        except BaseException:
+            staging.unlink(missing_ok=True)
+            raise
         dataset, passkey = data_manager.register(target, group, temporary)
 
         return {
