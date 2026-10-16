@@ -20,6 +20,7 @@ Create a `.env` file in the project root (it is gitignored):
 ```
 TITLE="Hi-CService"
 DATA_DIR=""
+TEMP_DATA_DIR=""
 STORE_DIR=""
 USE_STORAGE=True/False
 ```
@@ -27,6 +28,7 @@ USE_STORAGE=True/False
 | Key | Meaning |
 | --- | --- |
 | `DATA_DIR` | Folder holding the `.mcool` / `.cool` files that get served. |
+| `TEMP_DATA_DIR` | Where uploads the caller asked not to be kept are written. Defaults to `./tempData`, is created for you, and is emptied of cooler files on every start. |
 | `STORE_DIR` | Where calculated 2D graphs and 3D reconstructions are cached. Create this folder yourself, only the `2d` and `3d` subfolders inside it are made for you. |
 | `TITLE` | Name of the service. |
 | `USE_STORAGE` | Reuse already calculated results from `STORE_DIR` instead of recalculating them. |

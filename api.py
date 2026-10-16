@@ -44,7 +44,11 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         return data_manager.get_dataset_info(identifier, group)
 
     @app.post("/upload")
-    async def upload_dataset(file: UploadFile = File(...), group=Depends(authenticate)):
+    async def upload_dataset(
+        file: UploadFile = File(...),
+        temporary: bool = True,
+        group=Depends(authenticate),
+    ):
         if not settings.allow_uploads:
             raise HTTPException(status_code=403, detail="Uploads are disabled on this server.")
         
@@ -53,7 +57,8 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         if not stem or suffix not in (".cool", ".mcool"):
             raise HTTPException(status_code=400, detail="Only .cool and .mcool files can be uploaded.")
 
-        staging = Path(f"{data_manager.data_dir}/.upload-{uuid4().hex}.part")
+        staging_dir = settings.temp_data_dir if temporary else settings.data_dir
+        staging = Path(f"{staging_dir}/.upload-{uuid4().hex}.part")
         written = 0
         try:
             with staging.open("wb") as out:
@@ -66,11 +71,15 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         finally:
             await file.close()
 
-        target = data_manager.free_upload_path(stem, suffix)
+        target = data_manager.find_free_filename(stem, suffix, temporary)
         staging.replace(target)
-        dataset = data_manager.register(target, group)
+        dataset, passkey = data_manager.register(target, group, temporary)
 
-        return {"identifier": dataset.get_identifier(), "info": dataset.get_info()}
+        return {
+            "identifier": dataset.get_identifier(),
+            "info": dataset.get_info(),
+            "passkey": passkey,
+        }
 
     # Fetch tile data from a given dataset at selected level and tile coordinates
     # Importantly level zero == lowest detail (smallest total size)

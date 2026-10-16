@@ -1,17 +1,15 @@
 from pathlib import Path
 from fastapi import HTTPException
-
+from typing import Tuple
 from cooler_file import CoolFile
 
 
-class DataManager:
-    data_dir = ""
-    datasets: dict[str, CoolFile] = dict()
-    dataset_groups: dict[str, str] = dict()
-    groups: list[tuple[str, str]] = []
-
-    def __init__(self, settings):
-        self.data_dir = settings.data_dir
+class DataStore():
+    def __init__(self, directory):
+        self.data_dir = directory
+        self.datasets: dict[str, CoolFile] = dict()
+        self.dataset_groups: dict[str, str] = dict()
+        self.groups: list[tuple[str, str]] = []
         self.load_groups()
         self.fetch_datasets()
 
@@ -56,14 +54,7 @@ class DataManager:
         with group_file.open("a", encoding="utf-8") as f:
             f.write(f"{identifier}\n")
 
-    def register(self, filepath: Path, group: str | None = None):
-        try:
-            dataset = CoolFile(filepath)
-            dataset.verify()
-        except Exception as error:
-            filepath.unlink(missing_ok=True)
-            raise HTTPException(status_code=400, detail=f"The uploaded file could not be read as a Hi-C cooler file: {error}")
-
+    def register(self, dataset: CoolFile, group: str | None = None) -> tuple[CoolFile, str | None]:
         identifier = dataset.get_identifier()
         self.datasets[identifier] = dataset
         if group is not None:
@@ -71,10 +62,9 @@ class DataManager:
                 self.record_group(identifier, group)
             except OSError as error:
                 del self.datasets[identifier]
-                filepath.unlink(missing_ok=True)
-                raise HTTPException(status_code=500, detail=f"The dataset could not be recorded as belonging to group {group}, so it was not stored: {error}")
+                raise HTTPException(status_code=500, detail=f"The dataset could not be recorded as belonging to group {group}: {error}")
             self.dataset_groups[identifier] = group
-        return dataset
+        return dataset, None
 
     def fetch_datasets(self):
         dataset_groups_temp = dict()
@@ -83,7 +73,6 @@ class DataManager:
             if not file.is_file() or not filename.endswith(".txt"):
                 continue
             group = filename.split(".")[0]
-            print("Group:", group)
             if group not in [group[0] for group in self.groups]:
                 continue
             
@@ -111,11 +100,75 @@ class DataManager:
         return [identifier for identifier in self.datasets if self.is_visible(identifier, group)]
 
     def get_dataset(self, identifier: str, group: str | None = None):
-        dataset = self.datasets.get(identifier)
+        return self.datasets.get(identifier, group)
+
+    def get_dataset_info(self, identifier: str, group: str | None = None):
+        return self.get_dataset(identifier, group).get_info()
+
+class TempDataStore(DataStore):
+    def __init__(self, directory):
+        super().__init__(directory)
+
+    def register(self, dataset: CoolFile, group: str | None = None):
+        identifier = dataset.get_identifier()
+        self.datasets[identifier] = dataset
+        if group is not None:
+            try:
+                self.record_group(identifier, group)
+            except OSError as error:
+                del self.datasets[identifier]
+                raise HTTPException(status_code=500, detail=f"The dataset could not be recorded as belonging to group {group}: {error}")
+            self.dataset_groups[identifier] = group
+        print(self.datasets)
+        return dataset, None
+
+    def fetch_datasets(self):
+        print("Fetching temp datasets")
+        # TODO: Instead of fetching datasets, remove all from the data directory
+        pass
+
+class DataManager:
+    data_store: DataStore
+    temp_data_store = TempDataStore
+
+    def __init__(self, settings):
+        self.data_store = DataStore(settings.data_dir)
+        self.temp_data_store = TempDataStore(settings.temp_data_dir)
+
+    def get_group_from_pw(self, password):
+        group = self.data_store.get_group_from_pw(password)
+        if not group:
+            group = self.temp_data_store.get_group_from_pw(password)
+        return group
+
+    def find_free_filename(self, stem: str, suffix: str, temporary: bool) -> Path:
+        if temporary:
+            return self.temp_data_store.free_upload_path(stem + "Temp", suffix)
+        else:
+            return self.data_store.free_upload_path(stem, suffix)
+
+    def register(self, filepath: Path, group: str | None = None, temporary: bool = True) -> Tuple[CoolFile, str | None]:
+        try:
+            dataset = CoolFile(filepath)
+            dataset.verify()
+        except Exception as error:
+            filepath.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail=f"The uploaded file could not be read as a Hi-C cooler file: {error}")
+
+        if temporary:
+            return self.temp_data_store.register(dataset, group)
+        else:
+            return self.data_store.register(dataset, group)
+
+    def get_dataset_ids(self, group: str | None = None):
+        return self.data_store.get_dataset_ids(group) + self.temp_data_store.get_dataset_ids(group)
+
+    def get_dataset(self, identifier: str, group: str | None = None):
+        dataset = self.data_store.get_dataset(identifier, group)
+        if not dataset:
+            dataset = self.temp_data_store.get_dataset(identifier, group)
         if dataset is None:
             raise HTTPException(status_code=404, detail=f"Dataset with identifier {identifier} not found.")
-        if not self.is_visible(identifier, group):
-            raise HTTPException(status_code=403, detail=f"Dataset with identifier {identifier} is not available for group {group}.")
         return dataset
 
     def get_dataset_info(self, identifier: str, group: str | None = None):
