@@ -1,3 +1,5 @@
+import secrets
+import time
 from pathlib import Path
 from fastapi import HTTPException
 from typing import Tuple
@@ -100,32 +102,83 @@ class DataStore():
         return [identifier for identifier in self.datasets if self.is_visible(identifier, group)]
 
     def get_dataset(self, identifier: str, group: str | None = None):
-        return self.datasets.get(identifier, group)
+        dataset = self.datasets.get(identifier)
+        if not self.is_visible(identifier, group):
+            raise HTTPException(status_code=404, detail=f"Dataset with identifier {identifier} is not available.")
+        return dataset
 
     def get_dataset_info(self, identifier: str, group: str | None = None):
         return self.get_dataset(identifier, group).get_info()
 
 class TempDataStore(DataStore):
+    TTL_SECONDS = 30 * 60
+
     def __init__(self, directory):
+        self.group_access: dict[str, float] = dict()
+        self.ephemeral_groups: set[str] = set()
         super().__init__(directory)
 
-    def register(self, dataset: CoolFile, group: str | None = None):
+    def register(self, dataset: CoolFile, group: str | None = None) -> tuple[CoolFile, str | None]:
+        passkey = None
+        if group is None:
+            group = f"temp-{secrets.token_hex(8)}"
+            passkey = secrets.token_hex(16)
+            self.groups.append((group, passkey))
+            self.ephemeral_groups.add(group)
+
         identifier = dataset.get_identifier()
         self.datasets[identifier] = dataset
-        if group is not None:
-            try:
-                self.record_group(identifier, group)
-            except OSError as error:
-                del self.datasets[identifier]
-                raise HTTPException(status_code=500, detail=f"The dataset could not be recorded as belonging to group {group}: {error}")
-            self.dataset_groups[identifier] = group
-        print(self.datasets)
-        return dataset, None
+        self.dataset_groups[identifier] = group
+        self.group_access[group] = time.time()
+        return dataset, passkey
 
     def fetch_datasets(self):
-        print("Fetching temp datasets")
-        # TODO: Instead of fetching datasets, remove all from the data directory
-        pass
+        directory = Path(self.data_dir)
+        if not directory.is_dir():
+            return
+        for file in directory.iterdir():
+            if file.is_file() and file.suffix.lower() in (".cool", ".mcool"):
+                try:
+                    file.unlink(missing_ok=True)
+                except OSError as error:
+                    print(f"Could not remove temporary file {file}: {error}")
+
+    def get_dataset_ids(self, group: str | None = None):
+        if group:
+            self.touch_group(group)
+        self.evict_expired()
+        return [identifier for identifier in self.datasets if self.is_visible(identifier, group)]
+
+    def get_dataset(self, identifier: str, group: str | None = None):
+        if group:
+            self.touch_group(group)
+        self.evict_expired()
+        return super().get_dataset(identifier, group)
+
+    def touch_group(self, group: str):
+        self.group_access[group] = time.time()
+
+    def remove_dataset(self, identifier: str):
+        dataset = self.datasets.pop(identifier, None)
+        self.dataset_groups.pop(identifier, None)
+        if dataset is None:
+            return
+        try:
+            Path(dataset.filepath).unlink(missing_ok=True)
+        except OSError as error:
+            print(f"Could not remove temporary file {dataset.filepath}: {error}")
+
+    def evict_expired(self):
+        now = time.time()
+        expired = [group for group, seen in self.group_access.items() if now - seen > self.TTL_SECONDS]
+        for group in expired:
+            self.group_access.pop(group, None)
+            for identifier in [i for i, owner in self.dataset_groups.items() if owner == group]:
+                self.remove_dataset(identifier)
+            if group not in self.ephemeral_groups:
+                continue
+            self.ephemeral_groups.discard(group)
+            self.groups[:] = [(name, password) for name, password in self.groups if name != group]
 
 class DataManager:
     data_store: DataStore
