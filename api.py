@@ -47,7 +47,7 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
     async def upload_dataset(file: UploadFile = File(...), group=Depends(authenticate)):
         if not settings.allow_uploads:
             raise HTTPException(status_code=403, detail="Uploads are disabled on this server.")
-
+        
         name = Path((file.filename or "").replace("\\", "/")).name.replace("\x00", "").strip()
         stem, suffix = Path(name).stem, Path(name).suffix.lower()
         if not stem or suffix not in (".cool", ".mcool"):

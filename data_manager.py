@@ -26,7 +26,6 @@ class DataManager:
             parts = line.split()
             if len(parts) > 1:
                 self.groups.append((parts[0].lower(), parts[1]))
-        print(self.groups)
 
     def get_group_from_pw(self, password):
         for group, group_password in self.groups:
@@ -48,6 +47,15 @@ class DataManager:
             counter += 1
             base = f"{stem}_{counter}"
 
+    def record_group(self, identifier: str, group: str):
+        group_file = Path(self.data_dir) / f"{group}.txt"
+        existing = group_file.read_text(encoding="utf-8", errors="ignore") if group_file.is_file() else ""
+        listed = [line.strip().lower() for line in existing.splitlines() if line.strip() and not line.strip().startswith("#")]
+        if identifier.lower() in listed:
+            return
+        with group_file.open("a", encoding="utf-8") as f:
+            f.write(f"{identifier}\n")
+
     def register(self, filepath: Path, group: str | None = None):
         try:
             dataset = CoolFile(filepath)
@@ -55,9 +63,17 @@ class DataManager:
         except Exception as error:
             filepath.unlink(missing_ok=True)
             raise HTTPException(status_code=400, detail=f"The uploaded file could not be read as a Hi-C cooler file: {error}")
-        self.datasets[dataset.get_identifier()] = dataset
+
+        identifier = dataset.get_identifier()
+        self.datasets[identifier] = dataset
         if group is not None:
-            self.dataset_groups[dataset.get_identifier()] = group
+            try:
+                self.record_group(identifier, group)
+            except OSError as error:
+                del self.datasets[identifier]
+                filepath.unlink(missing_ok=True)
+                raise HTTPException(status_code=500, detail=f"The dataset could not be recorded as belonging to group {group}, so it was not stored: {error}")
+            self.dataset_groups[identifier] = group
         return dataset
 
     def fetch_datasets(self):
