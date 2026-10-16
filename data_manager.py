@@ -181,8 +181,7 @@ class TempDataStore(DataStore):
             self.groups[:] = [(name, password) for name, password in self.groups if name != group]
 
 class DataManager:
-    data_store: DataStore
-    temp_data_store = TempDataStore
+    TEMP_ID = 0
 
     def __init__(self, settings):
         self.data_store = DataStore(settings.data_dir)
@@ -196,7 +195,8 @@ class DataManager:
 
     def find_free_filename(self, stem: str, suffix: str, temporary: bool) -> Path:
         if temporary:
-            return self.temp_data_store.free_upload_path(stem + "Temp", suffix)
+            self.TEMP_ID += 1
+            return self.temp_data_store.free_upload_path(stem + "Temp" + str(self.TEMP_ID), suffix)
         else:
             return self.data_store.free_upload_path(stem, suffix)
 
