@@ -10,6 +10,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from graph_layouting import compute_graph_layout
 from pastis_reconstruction import reconstruct_3d
 
+import math
+from metrics.registry import get_metric, available_metrics
+from metrics.schemas import MetricRequest, MetricResponse
+from metrics.graph_utils import build_graph, reconstruct_nx_graph
+
 def create_api(app, settings: Settings, data_manager: DataManager, storage_manager: ReconstructionDataStore):
     security = HTTPBearer(auto_error=False)
 
@@ -148,4 +153,53 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         if (settings.use_storage):
             storage_manager.store_reconstruction(reconstruction, identifier, level, type, start, end, balanced)
         return reconstruction
+
+    # Returns a list of all available metrics, which can be used to evaluate a graph
+    @app.get("/metrics")
+    def list_metrics():
+        return {"metrics": available_metrics()}
+
+    # Evaluates the 2D Visualization graph of a dataset by a given metric and returns the score
+    @app.get("/metrics/evaluate/{metric}/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
+    def evaluate_dataset_graph(metric: str, identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: int = 3, group=Depends(authenticate)):
+        layouted_data = calculate_graph_layout(identifier, level, type, start, end, balanced, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=dist_filter, close_weight=close_weight)
+        try:
+            _metric = get_metric(metric)
+            graph = reconstruct_nx_graph(layouted_data)
+            score = _metric.evaluate(graph)
+
+            if not math.isfinite(score):
+                raise ValueError("Metric returned a non-finite score.")
+
+            return MetricResponse(
+                metric=_metric.name,
+                score=score,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+
+    # Evaluates a custom graph by a given metric and returns the score
+    @app.post("/metrics/evaluate", response_model=MetricResponse)
+    def evaluate_custom_graph(request: MetricRequest):
+        try:
+            metric = get_metric(request.metric)
+            graph = build_graph(request.graph)
+            score = metric.evaluate(graph)
+
+            if not math.isfinite(score):
+                raise ValueError("Metric returned a non-finite score.")
+
+            return MetricResponse(
+                metric=metric.name,
+                score=score,
+            )
+
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
 
