@@ -198,6 +198,8 @@ def check_declared_size(raw_content_length: str | None, max_bytes: int) -> None:
     transfer, or lower than what follows, so store_upload counts the bytes as they land and
     treats this only as an early exit.
     """
+    if not raw_content_length:
+        return
     try:
         declared = int(raw_content_length)
     except (TypeError, ValueError):
@@ -209,7 +211,7 @@ def check_declared_size(raw_content_length: str | None, max_bytes: int) -> None:
         )
 
 
-async def store_upload(file: UploadFile, staging: Path, max_bytes: int) -> None:
+async def store_upload(file: UploadFile, staging: Path, max_bytes: int) -> int:
     """Write the upload to `staging`, refusing it as soon as it stops being a plausible cooler.
 
     Both the size cap and the format check cut the transfer short rather than finishing it
@@ -249,76 +251,6 @@ async def store_upload(file: UploadFile, staging: Path, max_bytes: int) -> None:
     if not checked_magic:
         raise HTTPException(status_code=400, detail="The uploaded file is too small to be a cooler file.")
     return written
-
-
-async def scan(path: Path, host: str | None, port: int | None, unix_socket: str | None, timeout_seconds: int) -> None:
-    """Ask a clamd daemon about a stored file, refusing the upload if it cannot be scanned.
-
-    clamd speaks a line of text followed by length-prefixed chunks over a plain socket, so an
-    INSTREAM scan needs nothing beyond the standard library. An operator who configured a
-    scanner and then cannot reach it is not in a position to say the file is clean, so every
-    failure short of an `OK` answer ends with the file discarded.
-
-    Runs on a worker thread: a scan of a large file takes seconds, and sitting on the socket
-    from the endpoint itself would stall every other request the service is handling.
-    """
-    try:
-        answer = await run_in_threadpool(_ask_clamd, path, host, port, unix_socket, timeout_seconds)
-    except (OSError, RuntimeError) as error:
-        raise HTTPException(
-            status_code=503,
-            detail=f"The file could not be scanned ({error}), so it was not accepted.",
-        )
-
-    # A clean scan answers `OK`, a hit answers `<threat> FOUND`, anything else is clamd
-    # reporting a problem of its own.
-    reply = answer.decode(errors="ignore").strip().strip("\x00 ")
-    if reply == "OK":
-        return
-    if reply.endswith(" FOUND"):
-        raise HTTPException(
-            status_code=422,
-            detail=f"The file was rejected by the virus scanner as {reply[: -len(' FOUND')]}.",
-        )
-    raise HTTPException(status_code=503, detail=f"The virus scanner answered {reply!r}, so the upload was not accepted.")
-
-
-def _ask_clamd(path: Path, host: str | None, port: int | None, unix_socket: str | None, timeout_seconds: int) -> bytes:
-    connection = _connect_clamd(host, port, unix_socket, timeout_seconds)
-    try:
-        connection.sendall(b"INSTREAM\0")
-        with path.open("rb") as source:
-            while chunk := source.read(CLAMD_CHUNK_SIZE):
-                connection.sendall(struct.pack(">I", len(chunk)) + chunk)
-        connection.sendall(struct.pack(">I", 0))
-        return _read_clamd_answer(connection)
-    finally:
-        connection.close()
-
-
-def _connect_clamd(host: str | None, port: int | None, unix_socket: str | None, timeout_seconds: int) -> socket.socket:
-    if unix_socket and hasattr(socket, "AF_UNIX"):
-        connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        connection.settimeout(timeout_seconds)
-        connection.connect(unix_socket)
-        return connection
-    if not host or port is None:
-        raise RuntimeError("no clamd daemon is configured to scan uploads with")
-    return socket.create_connection((host, port), timeout=timeout_seconds)
-
-
-def _read_clamd_answer(connection: socket.socket) -> bytes:
-    """Read one newline-terminated reply, clamd's whole protocol being line based."""
-    received = bytearray()
-    while not received.endswith(b"\n"):
-        piece = connection.recv(4096)
-        if not piece:
-            break
-        received.extend(piece)
-        # A reply is one short line; anything longer is not an answer but a stream being echoed.
-        if len(received) > 4096:
-            break
-    return bytes(received).strip()
 
 
 def static_mount_directories(app) -> list[Path]:

@@ -36,31 +36,6 @@ USE_STORAGE=True/False
 | `MAX_UPLOAD_MB` | Largest accepted upload, counted from the bytes that actually arrive. Defaults to `2048`. |
 | `MAX_FILENAME_LENGTH` | Longest accepted file name. Defaults to `128`. |
 | `ALLOWED_ORIGINS` | Sites allowed to upload from a browser, comma separated, e.g. `https://chromograph.example.com,http://localhost:*`. `*` matches part of an address. Empty (the default) accepts any site; `*` on its own says so explicitly. |
-| `CLAMD_HOST` / `CLAMD_PORT` | A `clamd` daemon to virus-scan uploads with, over TCP. `CLAMD_PORT` defaults to `3310`. |
-| `CLAMD_SOCKET` | The same, over a unix socket, for when the scanner shares a host or container network namespace. |
-| `SCAN_TIMEOUT_SECONDS` | How long to wait for a scan answer before refusing the upload. Defaults to `120`. |
-
-Neither `CLAMD_HOST` nor `CLAMD_SOCKET` set means uploads are not scanned. When one of them is
-set, an upload the scanner cannot be reached for is refused rather than accepted.
-
-## Virus scanning
-
-Scanning is against a [`clamd`](https://docs.clamavis.net/) daemon and needs no Python packages —
-it is a short conversation over a socket. One alongside the service:
-
-```yaml
-# docker-compose.override.yml
-services:
-  clamav:
-    image: clamav/clamav:stable
-    volumes:
-      - clamav-signatures:/var/lib/clamav
-  hic-service:
-    environment:
-      CLAMD_HOST: clamav
-volumes:
-  clamav-signatures:
-```
 
 
 ## Run

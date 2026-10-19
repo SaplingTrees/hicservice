@@ -14,11 +14,6 @@ class Settings(BaseSettings):
     max_filename_length: int = 128
     allowed_origins: str = ""
 
-    clamd_host: str | None = None
-    clamd_port: int = 3310
-    clamd_socket: str | None = None
-    scan_timeout_seconds: int = 120
-
     @field_validator("max_upload_mb", "max_filename_length")
     @classmethod
     def reject_unusable_limits(cls, value: int) -> int:

@@ -14,17 +14,12 @@ from upload_security import (
     check_upload_request,
     discard_stale_uploads,
     safe_upload_name,
-    scan,
     staging_path,
     store_upload,
 )
 
 def create_api(app, settings: Settings, data_manager: DataManager, storage_manager: ReconstructionDataStore):
-    # Fail here rather than at the first upload: files landing in a folder the app also serves
-    # to browsers is the one mistake this cannot be undone by deleting a file later.
     assert_stored_outside_webroot(app, [settings.data_dir, settings.temp_data_dir])
-    # Nothing of ours is mid-transfer yet, so every staging file here belongs to an upload that
-    # stopped when the process did.
     discard_stale_uploads([settings.data_dir, settings.temp_data_dir])
 
     security = HTTPBearer(auto_error=False)
@@ -34,10 +29,6 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
             return None
         return data_manager.get_group_from_pw(credentials.credentials)
     
-    # The gate screen in the frontend asks this before letting the user in, so it can tell a
-    # wrong passcode apart from a server that is simply down. 401 means no passcode was sent,
-    # 403 that one was sent but matches no group; anonymous callers use the other endpoints
-    # without ever hitting this one, so both are errors here rather than "public access".
     @app.get("/auth")
     def check_passcode(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if credentials is None:
@@ -81,11 +72,7 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         Path(staging_dir).mkdir(parents=True, exist_ok=True)
         staging = staging_path(staging_dir)
         try:
-            # Counted and sniffed while it arrives rather than afterwards, so an oversized or
-            # mislabelled file costs one chunk of transfer instead of the whole thing.
             await store_upload(file, staging, max_bytes)
-            if settings.clamd_host or settings.clamd_socket:
-                await scan(staging, settings.clamd_host, settings.clamd_port, settings.clamd_socket, settings.scan_timeout_seconds)
         except BaseException:
             staging.unlink(missing_ok=True)
             raise
