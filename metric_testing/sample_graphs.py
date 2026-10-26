@@ -10,10 +10,10 @@ class SampleGraphs:
             {"id": 4, "x": 0.0, "y": 1.0},
         ]
         edges = [
-            {"source": 1, "target": 2},
-            {"source": 2, "target": 3},
-            {"source": 3, "target": 4},
-            {"source": 4, "target": 1},
+            {"source": 1, "target": 2, "orig_dist": 1.0},
+            {"source": 2, "target": 3, "orig_dist": 1.0},
+            {"source": 3, "target": 4, "orig_dist": 1.0},
+            {"source": 4, "target": 1, "orig_dist": 1.0},
         ]
         return GraphInput(nodes=nodes, edges=edges)
 
@@ -25,7 +25,7 @@ class SampleGraphs:
             {"id": 3, "x": 1.0, "y": 1.0},
         ]
         edges = [
-            {"source": 1, "target": 2},
-            {"source": 2, "target": 3},
+            {"source": 1, "target": 2, "orig_dist": 1.0},
+            {"source": 2, "target": 3, "orig_dist": 0.5},
         ]
         return GraphInput(nodes=nodes, edges=edges)
