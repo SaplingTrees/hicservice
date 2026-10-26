@@ -1,9 +1,10 @@
 from .base import IMetric
-from .test_metric import EdgeCountMetric
+from .test_metric import EdgeCountMetric, OrigDistSumMetric
 
 
 METRICS: dict[str, type[IMetric]] = {
     EdgeCountMetric().name: EdgeCountMetric,
+    OrigDistSumMetric().name: OrigDistSumMetric,
 }
 
 
