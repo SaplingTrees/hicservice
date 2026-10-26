@@ -5,3 +5,8 @@ h5py
 fastapi[standard]
 pydantic_settings
 uvicorn
+portion  # for CATAD
+MSTD @ git+https://github.com/zhanglabtools/MSTD.git@0a63b0b
+matplotlib  # for MSTD, probably unused in our implementation
+seaborn  # for MSTD, probably unused in our implementation
+colormap  # for MSTD, probably unused in our implementation

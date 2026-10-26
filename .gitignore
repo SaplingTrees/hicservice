@@ -3,3 +3,6 @@ __pycache__/
 .vscode
 .venv
 .env
+data
+notes.txt
+callers.puml
