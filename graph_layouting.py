@@ -23,6 +23,7 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
     G = nx.Graph()
     measured_distances = {}
     kamada_distances = {}
+    orig_distances = {}
     n = matrix.shape[0]
 
     for i in range(n):
@@ -31,7 +32,9 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
 
             if frequency_filter(frequency, freq_filter):
                 continue
-            distance = distance_function(frequency)
+            distance = distance_function(frequency) # take here
+
+            orig_distances[(i, j)] = distance
             
             if distance_filter(distance, dist_filter):
                 continue
@@ -75,18 +78,18 @@ def compute_graph_layout(matrix: np.array, type: str, infer_distances=True, freq
 
     match type:
         case "kamada":
-            return nx.kamada_kawai_layout(G, dist=kamada_distances, weight='distance')
+            return (nx.kamada_kawai_layout(G, dist=kamada_distances, weight='distance'), orig_distances)
         # Spring is Frucherman Reingold
         case "spring":
-            return nx.spring_layout(G, seed=42)
+            return (nx.spring_layout(G, seed=42), orig_distances)
         case "forceatlas2":
             result = nx.forceatlas2_layout(G, weight='distance')
-            return {node: pos.tolist() for node, pos in result.items()}
+            return ({node: pos.tolist() for node, pos in result.items()}, orig_distances)
         # Stresful is Stress majorization
         case "stressful":
-            return graphviz_layout(G, prog="neato")
+            return (graphviz_layout(G, prog="neato"), orig_distances)
         case "mds":
-            return compute_mds(G)
+            return (compute_mds(G), orig_distances)
         case _:
             raise ValueError("Layout type " + type + " is not supported.")
         

@@ -136,7 +136,7 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
             return storage_manager.load_graph(identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight)
 
         matrix = dataset.get_region_pos(level, start, end, start, end, balanced)
-        positions = compute_graph_layout(matrix, type, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=(None if dist_filter <= 0 else dist_filter), mod_weight=close_weight)
+        positions, _ = compute_graph_layout(matrix, type, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=(None if dist_filter <= 0 else dist_filter), mod_weight=close_weight)
         result = [[key, pos[0], pos[1]] for key, pos in positions.items()]
         if (settings.use_storage):
             storage_manager.store_graph(result, identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight)
@@ -162,10 +162,10 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
     # Evaluates the 2D Visualization graph of a dataset by a given metric and returns the score
     @app.get("/metrics/evaluate/{metric}/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
     def evaluate_dataset_graph(metric: str, identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: int = 3, group=Depends(authenticate)):
-        layouted_data = calculate_graph_layout(identifier, level, type, start, end, balanced, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=dist_filter, close_weight=close_weight)
+        layouted_data, orig_distances = calculate_graph_layout(identifier, level, type, start, end, balanced, infer_distances=infer_distances, freq_filter=freq_filter, dist_filter=dist_filter, close_weight=close_weight)
         try:
             _metric = get_metric(metric)
-            graph = reconstruct_nx_graph(layouted_data)
+            graph = reconstruct_nx_graph(layouted_data, orig_distances)
             score = _metric.evaluate(graph)
 
             if not math.isfinite(score):

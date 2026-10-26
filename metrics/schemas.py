@@ -10,6 +10,7 @@ class GraphNode(BaseModel):
 class GraphEdge(BaseModel):
     source: int
     target: int
+    orig_dist: float
 
 
 class GraphInput(BaseModel):
