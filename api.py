@@ -82,6 +82,7 @@ def create_api(app, settings, data_manager: DataManager):
 
     class TADList(BaseModel):
         caller: str
+        start: int
         tads: list[tuple[int, int]]
 
     class TADCallResponse(BaseModel):
@@ -89,12 +90,16 @@ def create_api(app, settings, data_manager: DataManager):
 
     caller_registry: dict[str, dict[str, BaseModel | str]] = {
         "CATAD": {
+            "balanced": False,  # doesn't work with balanced matrix
+            "nan_filler": 0,  # assumes no nans, TODO read the paper
             "model": CATADParameters,
-            "call_caller": call_catad
+            "caller_function": call_catad
         },
         "MSTD": {
+            "balanced": True,  # according to paper
+            "nan_filler": None,  # fills nans
             "model": MSTDParameters,
-            "call_caller": call_mstd
+            "caller_function": call_mstd
         }
     }
 
@@ -113,28 +118,34 @@ def create_api(app, settings, data_manager: DataManager):
         assert start_x == start_y and end_x == end_y  # matrix should be symmetrical
 
         dataset = data_manager.get_dataset(identifier)
-
-        # CATAD doesn't expect balanced matrix
-        matrix = dataset.get_region_pos(level, start_x, end_x, start_y, end_y, balanced=False)
-        # MSTD expects balanced matrix
-        matrix_balanced = dataset.get_region_pos(level, start_x, end_x, start_y, end_y, balanced=True)
+        info = get_dataset_info(identifier)
+        c = dataset.open_cooler(level)
 
         # create a temporary directory where TAD callers can work with files
         with tempfile.TemporaryDirectory() as tmpdirname:
-            matrix_path = os.path.join(tmpdirname, "matrix.txt")
-            matrix_balanced_path = os.path.join(tmpdirname, "matrix_balanced.txt")
             output_path = os.path.join(tmpdirname, "tads_out.txt")
-
-            # save both balanced and unbalanced version since different callers have different assumptions
-            np.savetxt(matrix_path, matrix, delimiter="\t", fmt="%g")
-            np.savetxt(matrix_balanced_path, matrix_balanced, delimiter="\t", fmt="%g")
-            
+                        
             validated_parameters = validate_parameters(caller_parameters)
 
-            result: list[TADList] = []
-            for name, data in caller_registry.items():
+            tadlists: list[TADList] = []
+            for name, config in caller_registry.items():
                 if name in validated_parameters:
-                    tad_list = data["call_caller"](matrix_path, output_path, validated_parameters[name])
-                    result.append(TADList(caller=name, tads=tad_list))
+                    # call tads and save results
+                    # TODO test this extent filtering
+                    extents = [c.extent(chromosome) for chromosome in info["chromosomes"]]
+                    extents_filtered = [(start, end) for start, end in extents if end > start_x and start < end_x]
+                    for start, end in extents_filtered:  # detect in all chromosomes that are included in range
+                        caller_function = config["caller_function"]
+                        matrix_name = f"matrix_{start}_{end}_{config["balanced"]}_{config["nan_filler"]}.txt"
+                        matrix_path = os.path.join(tmpdirname, matrix_name)
 
-        return TADCallResponse(tadlists=result)
+                        # create the appropriate matrix if it hasn't been created yet
+                        if not os.path.isfile(matrix_path):
+                            matrix = dataset.get_region_pos(level, start, end, start, end, balanced=config["balanced"], nan_filler=config["nan_filler"])
+                            np.savetxt(matrix_path, matrix, delimiter="\t", fmt="%g")
+
+                        tad_list = caller_function(matrix_path, output_path, validated_parameters[name])
+                        # the tads are in local chromosome coordinates
+                        tadlists.append(TADList(caller=name, start=start, tads=tad_list))
+
+        return TADCallResponse(tadlists=tadlists)
