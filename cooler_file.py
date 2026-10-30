@@ -78,7 +78,7 @@ class CoolFile:
         else:
             return cooler.Cooler(str(self.filepath))
 
-    def create_tile(self, level, start_x, end_x, start_y, end_y, balanced=False):
+    def create_tile(self, level, start_x, end_x, start_y, end_y, balanced=False, nan_filler=-1):
         size = self.sizes[level]
         if start_x > size or start_y > size:
             raise ValueError(f"Tile coordinates out of range.")
@@ -92,7 +92,7 @@ class CoolFile:
         # TODO 2: Should check how doing the slicing in this way handles cells with no entries
         #  Should be NaNs, but likely will be 0, in which case i need to use a different access method...
         slice = data[start_y:min(end_y, size), start_x:min(end_x, size)]
-        cleaned = np.nan_to_num(slice, nan=-1)
+        cleaned = np.nan_to_num(slice, nan=nan_filler) if nan_filler is not None else slice
         return cleaned
 
     def get_tile(self, level, tile_x, tile_y, balanced=False, pad=True):
@@ -118,11 +118,11 @@ class CoolFile:
             constant_values=-1
         )
 
-    def get_region_pos(self, level, start_x, end_x, start_y, end_y, balanced=False):
+    def get_region_pos(self, level, start_x, end_x, start_y, end_y, balanced=False, nan_filler=-1):
         if level >= self.n_levels:
             raise ValueError(f"Attempted to fetch tile from level out of bounds.")
 
-        return self.create_tile(level, start_x, end_x + 1, start_y, end_y + 1, balanced)
+        return self.create_tile(level, start_x, end_x + 1, start_y, end_y + 1, balanced, nan_filler)
 
     def get_region(self, level, region_start_x, region_end_x, region_start_y, region_end_y, balanced=False):
         if level >= self.n_levels:

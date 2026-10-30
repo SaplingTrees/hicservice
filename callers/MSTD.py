@@ -10,9 +10,10 @@ class MSTDParameters(BaseModel):
     symmetry: Literal[0, 1] = 1
     window: int = Field(default=7, ge=5, le=10)
 
-def call_mstd(matrix_path, output_path, parameters):
+def call_mstd(matrix_path, output_path, parameters: MSTDParameters):
     tad_list = []
 
+    # TODO figure out if we can redirect the output of this function
     MSTD_v1.MSTD(matrix_path, output_path, MDHD=parameters.MDHD, symmetry=parameters.symmetry, window=parameters.window, visualization=0)
 
     with open(output_path, newline="") as file:
