@@ -24,6 +24,7 @@ def pretty_print_metric_response(response: MetricResponse):
 graphs = [
     SampleGraphs.get_sample_graph_1(),
     SampleGraphs.get_sample_graph_2(),
+    SampleGraphs.get_sample_graph_3(),
 ]
 
 for idx, g in enumerate(graphs):
