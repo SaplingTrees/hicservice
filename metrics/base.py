@@ -12,6 +12,6 @@ class IMetric(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, graph: nx.Graph) -> float:
+    def evaluate(self, graph: nx.Graph, **parameters) -> float:
         """Calculate a numeric score for the input graph."""
         pass
