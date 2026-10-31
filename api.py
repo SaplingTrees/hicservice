@@ -12,7 +12,7 @@ from pastis_reconstruction import reconstruct_3d
 
 import math
 from metrics.registry import get_metric, available_metrics
-from metrics.schemas import MetricRequest, MetricResponse
+from metrics.schemas import MetricRequest, MetricResponse, DatasetMetricRequest
 from metrics.graph_utils import build_graph, reconstruct_nx_graph
 
 def create_api(app, settings: Settings, data_manager: DataManager, storage_manager: ReconstructionDataStore):
@@ -159,6 +159,70 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
     def list_metrics():
         return {"metrics": available_metrics()}
 
+    @app.post("/metrics/evaluate/dataset")
+    def evaluate_dataset_graph(
+        request: DatasetMetricRequest,
+        group=Depends(authenticate)
+    ):
+        try:
+            # Retrieve dataset
+            dataset = data_manager.get_dataset(
+                request.dataset.identifier,
+                group
+            )
+
+            # Generate graph layout
+            matrix = dataset.get_region_pos(
+                request.dataset.level,
+                request.dataset.start,
+                request.dataset.end,
+                request.dataset.start,
+                request.dataset.end,
+                request.dataset.balanced
+            )
+
+            layout = request.layout_parameters
+
+            positions, orig_distances = compute_graph_layout(
+                matrix,
+                request.dataset.type,
+                infer_distances=layout.infer_distances,
+                freq_filter=layout.freq_filter,
+                dist_filter=(
+                    None if layout.dist_filter <= 0
+                    else layout.dist_filter
+                ),
+                mod_weight=layout.close_weight
+            )
+
+            layouted_data = [
+                [key, pos[0], pos[1]]
+                for key, pos in positions.items()
+            ]
+
+            # Reconstruct graph and evaluate metric
+            metric = get_metric(request.metric)
+            graph = reconstruct_nx_graph(layouted_data, orig_distances)
+
+            score = metric.evaluate(
+                graph,
+                **request.metric_parameters
+            )
+
+            if not math.isfinite(score):
+                raise ValueError("Metric returned a non-finite score.")
+
+            return MetricResponse(
+                metric=metric.name,
+                score=score
+            )
+
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc)
+            ) from exc
+
     # Evaluates the 2D Visualization graph of a dataset by a given metric and returns the score
     @app.get("/metrics/evaluate/{metric}/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
     def evaluate_dataset_graph(metric: str, identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: int = 3, group=Depends(authenticate)):
@@ -192,7 +256,7 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         try:
             metric = get_metric(request.metric)
             graph = build_graph(request.graph)
-            score = metric.evaluate(graph)
+            score = metric.evaluate(graph, **request.parameters)
 
             if not math.isfinite(score):
                 raise ValueError("Metric returned a non-finite score.")

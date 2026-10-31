@@ -2,6 +2,7 @@ from .base import IMetric
 from .test_metric import EdgeCountMetric, OrigDistSumMetric
 from .crossing_edges_metric import CrossingEdgesMetric
 from .stress_metric import StressMetric
+from .RMSE_metric import RMSEMetric
 
 
 METRICS: dict[str, type[IMetric]] = {
@@ -9,6 +10,7 @@ METRICS: dict[str, type[IMetric]] = {
     OrigDistSumMetric().name: OrigDistSumMetric,
     CrossingEdgesMetric().name: CrossingEdgesMetric,
     StressMetric().name: StressMetric,
+    RMSEMetric().name: RMSEMetric,
 }
 
 

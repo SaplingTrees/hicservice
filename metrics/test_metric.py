@@ -7,7 +7,7 @@ class EdgeCountMetric(IMetric):
     def name(self) -> str:
         return "edge_count"
 
-    def evaluate(self, graph: nx.Graph) -> float:
+    def evaluate(self, graph: nx.Graph, **parameters) -> float:
         return float(graph.number_of_edges())
 
 class OrigDistSumMetric(IMetric):
@@ -16,7 +16,7 @@ class OrigDistSumMetric(IMetric):
     def name(self) -> str:
         return "orig_dist_sum"
 
-    def evaluate(self, graph: nx.Graph) -> float:
+    def evaluate(self, graph: nx.Graph, **parameters) -> float:
         sum = 0
         distances = nx.get_edge_attributes(graph, "orig_dist")
 

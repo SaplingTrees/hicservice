@@ -7,7 +7,7 @@ import math
 def evaluate_custom_graph(request: MetricRequest):
     metric = get_metric(request.metric)
     graph = build_graph(request.graph)
-    score = metric.evaluate(graph)
+    score = metric.evaluate(graph, **request.parameters)
 
     if not math.isfinite(score):
         raise ValueError("Metric returned a non-finite score.")
@@ -32,6 +32,11 @@ for idx, g in enumerate(graphs):
         print("Evaluating sample graph ", idx + 1, " with ", m, " metric:")
         response = evaluate_custom_graph(MetricRequest(
             metric=m,
-            graph=g
+            graph=g,
+            parameters={
+                "normalize" : True,
+                "weighting" : "uniform",
+                "selection" : "edges"
+            }
         ))
         pretty_print_metric_response(response)

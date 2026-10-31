@@ -7,7 +7,9 @@ class CrossingEdgesMetric(IMetric):
     def name(self) -> str:
         return "crossing_edges"
 
-    def evaluate(self, graph: nx.Graph) -> float:
+    def evaluate(self, graph: nx.Graph, **parameters) -> float:
+        relative: bool = parameters.get("relative", False)
+
         crossing_count = 0
         edges = list(graph.edges)
         positions = nx.get_node_attributes(graph, "pos")
@@ -19,6 +21,9 @@ class CrossingEdgesMetric(IMetric):
 
                 if self._edges_cross(edge1, edge2, positions):
                     crossing_count += 1
+
+        if relative:
+            return float(crossing_count) / len(edges)
 
         return float(crossing_count)
 
