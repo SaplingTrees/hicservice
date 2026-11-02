@@ -18,7 +18,7 @@ def evaluate_custom_graph(request: MetricRequest):
     )
 
 def pretty_print_metric_response(response: MetricResponse):
-    print(f"Metric: {response.metric}")
+    print(f"\tMetric: {response.metric}", end=" | ")
     print(f"Score: {response.score:.4f}")
 
 graphs = [
@@ -28,8 +28,8 @@ graphs = [
 ]
 
 for idx, g in enumerate(graphs):
+    print("Evaluating sample graph", idx + 1, "with:")
     for m in available_metrics():
-        print("Evaluating sample graph ", idx + 1, " with ", m, " metric:")
         response = evaluate_custom_graph(MetricRequest(
             metric=m,
             graph=g,
