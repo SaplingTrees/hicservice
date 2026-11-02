@@ -92,12 +92,17 @@ def create_api(app, settings, data_manager: DataManager):
         callers: dict[str, MSTDParameters | CATADParameters]
 
     class TADList(BaseModel):
-        caller: str
         start: int
         tads: list[tuple[int, int]]
 
+    class CallerResult(BaseModel):
+        caller: str
+        start: int
+        end: int
+        lists: list[TADList]
+
     class TADCallResponse(BaseModel):
-        tadlists: list[TADList]
+        tadlists: list[CallerResult]
 
     caller_registry: dict[str, dict[str, BaseModel | str]] = {
         "CATAD": {
@@ -138,9 +143,10 @@ def create_api(app, settings, data_manager: DataManager):
                         
             validated_parameters = validate_parameters(caller_parameters)
 
-            tadlists: list[TADList] = []
+            response = TADCallResponse(tadlists=[])
             for name, config in caller_registry.items():
                 if name in validated_parameters:
+                    caller_result = CallerResult(caller=name, start=start_x, end=end_x, lists=[])
                     # call tads and save results
                     # TODO test this extent filtering
                     extents = [c.extent(chromosome) for chromosome in info["chromosomes"]]
@@ -155,8 +161,9 @@ def create_api(app, settings, data_manager: DataManager):
                             matrix = dataset.get_region_pos(level, start, end, start, end, balanced=config["balanced"], nan_filler=config["nan_filler"])
                             np.savetxt(matrix_path, matrix, delimiter="\t", fmt="%g")
 
-                        tad_list = caller_function(matrix_path, output_path, validated_parameters[name])
+                        tad_list_chromosome = caller_function(matrix_path, output_path, validated_parameters[name])
                         # the tads are in local chromosome coordinates
-                        tadlists.append(TADList(caller=name, start=start, tads=tad_list))
+                        caller_result.lists.append(TADList(caller=name, start=start, tads=tad_list_chromosome))
+                    response.tadlists.append(caller_result)
 
-        return TADCallResponse(tadlists=tadlists)
+        return response
