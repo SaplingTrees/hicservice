@@ -112,7 +112,7 @@ class CoolFile:
         pad_w = max(0, TILE_SIZE - width)
 
         return np.pad(
-            tile.astype(float),
+            tile.astype(np.float32),
             ((0, pad_h), (0, pad_w)),
             mode='constant',
             constant_values=-1
