@@ -33,7 +33,7 @@ def create_api(app, settings, data_manager: DataManager):
             end = time.perf_counter() - start
             print(f"Execution time: {end:.6f}s")
             return {"matrix": tile.tolist(), "max_value": max_value}
-        compressed = compress(tile.tobytes())
+        compressed = compress(tile.tobytes(), compresslevel=1)
         end = time.perf_counter() - start
         print(f"Execution time: {end:.6f}s")
         return Response(
@@ -52,7 +52,7 @@ def create_api(app, settings, data_manager: DataManager):
         tile = dataset.get_region_pos(level, start_x, end_x, start_y, end_y, balanced)
         if test:
             return {"matrix": tile.tolist()}
-        compressed = compress(tile.tobytes())
+        compressed = compress(tile.tobytes(), compresslevel=1)
         return Response(
             content=compressed,
             media_type="application/octet-stream",
