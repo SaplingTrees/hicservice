@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class CATADParameters(BaseModel):
     """
     Args:
-      CS_threshold (float): The threshold for cosion similarity.
+      CS_threshold (float): The threshold for cosine similarity.
     """
     CS_threshold: float = Field(default=0.8, ge=0.1, le=0.9)
 

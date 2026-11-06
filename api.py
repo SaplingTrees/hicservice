@@ -102,6 +102,7 @@ def create_api(app, settings, data_manager: DataManager):
         lists: list[TADList]
 
     class TADCallResponse(BaseModel):
+        size: int
         tadlists: list[CallerResult]
 
     caller_registry: dict[str, dict[str, BaseModel | str]] = {
@@ -143,7 +144,7 @@ def create_api(app, settings, data_manager: DataManager):
                         
             validated_parameters = validate_parameters(caller_parameters)
 
-            response = TADCallResponse(tadlists=[])
+            response = TADCallResponse(size=c.shape[0], tadlists=[])
             for name, config in caller_registry.items():
                 if name in validated_parameters:
                     caller_result = CallerResult(caller=name, start=start_x, end=end_x, lists=[])
