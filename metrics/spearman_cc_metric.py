@@ -22,6 +22,6 @@ class SpearmanCorrelationCoefficientMetric(IMetric):
         )
 
         if not np.isfinite(result.statistic):
-            raise ValueError("Pearson correlation is undefined.")
+            raise ValueError("Spearman correlation is undefined.")
 
         return float(result.statistic)

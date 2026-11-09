@@ -30,13 +30,17 @@ graphs = [
 for idx, g in enumerate(graphs):
     print("Evaluating sample graph", idx + 1, "with:")
     for m in available_metrics():
-        response = evaluate_custom_graph(MetricRequest(
-            metric=m,
-            graph=g,
-            parameters={
-                "normalize" : True,
-                "weighting" : "uniform",
-                "selection" : "edges"
-            }
-        ))
-        pretty_print_metric_response(response)
+        try:
+            response = evaluate_custom_graph(MetricRequest(
+                metric=m,
+                graph=g,
+                parameters={
+                    "normalize" : True,
+                    "weighting" : "uniform",
+                    "selection" : "edges"
+                }
+            ))
+            pretty_print_metric_response(response)
+
+        except Exception as e:
+            print(f"\tMetric: {m} | Error: {e}")
