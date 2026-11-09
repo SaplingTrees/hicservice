@@ -39,8 +39,8 @@ class SampleGraphs:
             {"id": 4, "x": 0.0, "y": 1.0},
         ]
         edges = [
-            {"source": 1, "target": 3, "orig_dist": 1.0},
+            {"source": 1, "target": 3, "orig_dist": 1.05},
             {"source": 3, "target": 4, "orig_dist": 1.0},
-            {"source": 4, "target": 2, "orig_dist": 1.0},
+            {"source": 4, "target": 2, "orig_dist": 1.1},
         ]
         return GraphInput(nodes=nodes, edges=edges)
