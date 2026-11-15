@@ -123,7 +123,7 @@ def run_experiment2():
     )
 
     layout_parameters = LayoutParameters(
-        infer_distances=True,
+        infer_distances=False,
         freq_filter=0,
         dist_filter=-1,
         close_weight=2.0
