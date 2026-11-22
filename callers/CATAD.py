@@ -28,7 +28,8 @@ def call_catad(matrix_path, output_path, parameters: CATADParameters):
             str(parameters.CS_threshold),
             output_path,
         ],
-        check=True,
+        #check=True,
+        check=False,
     )
 
     # get results

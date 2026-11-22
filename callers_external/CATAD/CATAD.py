@@ -81,8 +81,12 @@ def Cosine_Similarity(a,b,df,M):
     for i in range(len(df)):
         if i!=a and i!=b:
             feature_region=[df.iloc[:,0][i]-1,df.iloc[:,1][i]-1]
-            ave_contact1=np.mean(M[region1[0]:region1[-1]+1,feature_region[0]:feature_region[-1]+1])/np.mean(M[region1[0]:region1[-1]+1,region1[0]:region1[-1]+1])
-            ave_contact2=np.mean(M[region2[0]:region2[-1]+1,feature_region[0]:feature_region[-1]+1])/np.mean(M[region2[0]:region2[-1]+1,region2[0]:region2[-1]+1])
+            diag1 = np.mean(M[region1[0]:region1[-1]+1,region1[0]:region1[-1]+1])
+            diag2 = np.mean(M[region2[0]:region2[-1]+1,region2[0]:region2[-1]+1])
+            if diag1 == 0 or diag2 == 0 or np.isnan(diag1) or np.isnan(diag2):
+                return 0.0
+            ave_contact1=np.mean(M[region1[0]:region1[-1]+1,feature_region[0]:feature_region[-1]+1])/diag1
+            ave_contact2=np.mean(M[region2[0]:region2[-1]+1,feature_region[0]:feature_region[-1]+1])/diag2
             vector1.append(ave_contact1)
             vector2.append(ave_contact2)
     CS=CS_calculate(vector1,vector2)
@@ -242,6 +246,8 @@ for bin in binA:
     index=binA.index(bin)
     high_lst=High_lst[index]
     high_lst=IQR_detection([x[1] for x in high_lst],3)[0]
+    if not high_lst:
+        continue
     up=high_lst[0]
     down=high_lst[-1]
     if bin>=up and bin<=down:
@@ -374,28 +380,41 @@ while(row<len(nonoverlap_precore)):
 
 boundary_lst=[]
 
-for index in range(len(core_lst)):
-    if index==0:
-        up_B=core_lst[index][0]-1
-        for i in list(range(core_lst[index][0]-1)):
-            if i in validHighlst_binA:
-                up_B=i
-                break
-        down_B,next_up_B,between_core=boundary_location([core_lst[index][0]-1,core_lst[index][-1]-1],[core_lst[index+1][0]-1,core_lst[index+1][-1]-1],data,validHighlst_binA)
-        boundary_lst.append(up_B)
-        boundary_lst.append(down_B)
-        boundary_lst.append(next_up_B)
-    elif index==len(core_lst)-1:
-        down_B=len(data)-1
-        for i in list(range(len(data)-1,core_lst[index][-1]-1,-1)):
-            if i in validHighlst_binA:
-                down_B=i
-                break
-        boundary_lst.append(down_B)
-    else:
-        down_B,next_up_B,between_core=boundary_location([core_lst[index][0]-1,core_lst[index][-1]-1],[core_lst[index+1][0]-1,core_lst[index+1][-1]-1],data,validHighlst_binA)
-        boundary_lst.append(down_B)
-        boundary_lst.append(next_up_B)
+if len(core_lst) == 1:
+    up_B = core_lst[0][0] - 1
+    for i in range(core_lst[0][0] - 1):
+        if i in validHighlst_binA:
+            up_B = i
+            break
+    down_B = len(data) - 1
+    for i in range(len(data) - 1, core_lst[0][-1] - 1, -1):
+        if i in validHighlst_binA:
+            down_B = i
+            break
+    boundary_lst.extend([up_B, down_B])
+else:
+    for index in range(len(core_lst)):
+        if index==0:
+            up_B=core_lst[index][0]-1
+            for i in list(range(core_lst[index][0]-1)):
+                if i in validHighlst_binA:
+                    up_B=i
+                    break
+            down_B,next_up_B,between_core=boundary_location([core_lst[index][0]-1,core_lst[index][-1]-1],[core_lst[index+1][0]-1,core_lst[index+1][-1]-1],data,validHighlst_binA)
+            boundary_lst.append(up_B)
+            boundary_lst.append(down_B)
+            boundary_lst.append(next_up_B)
+        elif index==len(core_lst)-1:
+            down_B=len(data)-1
+            for i in list(range(len(data)-1,core_lst[index][-1]-1,-1)):
+                if i in validHighlst_binA:
+                    down_B=i
+                    break
+            boundary_lst.append(down_B)
+        else:
+            down_B,next_up_B,between_core=boundary_location([core_lst[index][0]-1,core_lst[index][-1]-1],[core_lst[index+1][0]-1,core_lst[index+1][-1]-1],data,validHighlst_binA)
+            boundary_lst.append(down_B)
+            boundary_lst.append(next_up_B)
 
 tad_lst=[]
 

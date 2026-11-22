@@ -91,24 +91,25 @@ def create_api(app, settings, data_manager: DataManager):
     class TADCallRequest(BaseModel):
         callers: dict[str, MSTDParameters | CATADParameters]
 
-    class TADList(BaseModel):
+    class ChromosomeTADList(BaseModel):
         start: int
+        end: int
         tads: list[tuple[int, int]]
 
     class CallerResult(BaseModel):
         caller: str
         start: int
         end: int
-        lists: list[TADList]
+        chromosomeTADLists: list[ChromosomeTADList]
 
     class TADCallResponse(BaseModel):
         size: int
-        tadlists: list[CallerResult]
+        callerResults: list[CallerResult]
 
     caller_registry: dict[str, dict[str, BaseModel | str]] = {
         "CATAD": {
             "balanced": False,  # doesn't work with balanced matrix
-            "nan_filler": 0,  # assumes no nans, TODO read the paper
+            "nan_filler": 0,  # the CATAD implementation I have assumes no nans, TODO read the paper
             "model": CATADParameters,
             "caller_function": call_catad
         },
@@ -141,17 +142,22 @@ def create_api(app, settings, data_manager: DataManager):
         # create a temporary directory where TAD callers can work with files
         with tempfile.TemporaryDirectory() as tmpdirname:
             output_path = os.path.join(tmpdirname, "tads_out.txt")
-                        
+
             validated_parameters = validate_parameters(caller_parameters)
 
-            response = TADCallResponse(size=c.shape[0], tadlists=[])
+            response = TADCallResponse(size=c.shape[0], callerResults=[])
             for name, config in caller_registry.items():
                 if name in validated_parameters:
-                    caller_result = CallerResult(caller=name, start=start_x, end=end_x, lists=[])
+                    caller_result = CallerResult(caller=name, start=start_x, end=end_x, chromosomeTADLists=[])
                     # call tads and save results
                     # TODO test this extent filtering
                     extents = [c.extent(chromosome) for chromosome in info["chromosomes"]]
-                    extents_filtered = [(start, end) for start, end in extents if end > start_x and start < end_x]
+                    min_chromosome_length = 6 # this probably makes sense because why would we detect tads in 2x2 matrix, TODO figure out the ideal min length
+                    # min_chromosome_length = 0 this breaks mstd for lower levels. I should probably put some exception there or something (IndexError: tuple index out of range)
+                    extents_filtered = [(start, end) for start, end in extents if end > start_x and start < end_x and end - start >= min_chromosome_length]
+                    print("extents: ", extents_filtered)
+                    print("unfiltered: ", info)
+                    #return
                     for start, end in extents_filtered:  # detect in all chromosomes that are included in range
                         caller_function = config["caller_function"]
                         matrix_name = f"matrix_{start}_{end}_{config["balanced"]}_{config["nan_filler"]}.txt"
@@ -164,7 +170,7 @@ def create_api(app, settings, data_manager: DataManager):
 
                         tad_list_chromosome = caller_function(matrix_path, output_path, validated_parameters[name])
                         # the tads are in local chromosome coordinates
-                        caller_result.lists.append(TADList(caller=name, start=start, tads=tad_list_chromosome))
-                    response.tadlists.append(caller_result)
+                        caller_result.chromosomeTADLists.append(ChromosomeTADList(start=start, end=end, tads=tad_list_chromosome))
+                    response.callerResults.append(caller_result)
 
         return response
