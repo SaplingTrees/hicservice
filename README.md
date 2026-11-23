@@ -36,6 +36,7 @@ USE_STORAGE=True/False
 | `MAX_UPLOAD_MB` | Largest accepted upload, counted from the bytes that actually arrive. Defaults to `2048`. |
 | `MAX_FILENAME_LENGTH` | Longest accepted file name. Defaults to `128`. |
 | `ALLOWED_ORIGINS` | Sites allowed to upload from a browser, comma separated, e.g. `https://chromograph.example.com,http://localhost:*`. `*` matches part of an address. Empty (the default) accepts any site; `*` on its own says so explicitly. |
+| `GZIP_LEVEL` | zlib level (0-9) for binary matrix responses. Defaults to `1`: the matrix is tens of megabytes and is decompressed by the browser while it arrives, so a fast, low level is usually a better trade than a slow, small one. |
 
 
 ## Run

@@ -21,6 +21,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The matrix endpoints describe their binary payload in these headers; without this a
+    # cross-origin frontend cannot read them and would have to guess the dtype and shape.
+    expose_headers=["X-Matrix-Dtype", "X-Matrix-Order", "X-Matrix-Byteorder", "X-Matrix-Shape"],
 )
 
 create_api(app, settings, data_manager, storage_manager)

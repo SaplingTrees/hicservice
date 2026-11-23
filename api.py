@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from data_manager import DataManager
@@ -23,6 +24,38 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
     discard_stale_uploads([settings.data_dir, settings.temp_data_dir])
 
     security = HTTPBearer(auto_error=False)
+
+    def matrix_response(tile, request: Request):
+        """
+        Sends a matrix as raw numbers in the server's native byte order instead of a JSON
+        list of lists. The browser decodes it straight into a typed array, which avoids
+        marshalling millions of numbers through JSON text. Dtype, order and shape travel in
+        headers so the body needs no envelope; Content-Encoding lets the browser decompress
+        in transit.
+        """
+        payload = tile.tobytes(order="C")
+        rows, cols = tile.shape
+        headers = {
+            "X-Matrix-Dtype": tile.dtype.name,
+            "X-Matrix-Order": "C",
+            "X-Matrix-Byteorder": sys.byteorder,
+            "X-Matrix-Shape": f"{rows},{cols}",
+        }
+        # Mirror the same information in Content-Type parameters. Unlike the X-* headers,
+        # Content-Type is readable across origins without Access-Control-Expose-Headers, so
+        # the client can still decode the body if a proxy or an older CORS setup hides them.
+        media_type = f"application/octet-stream; dtype={tile.dtype.name}; shape={rows}x{cols}; byteorder={sys.byteorder}"
+
+        # Only use a content coding the caller advertised. Browsers always do; a script
+        # using a plain HTTP client may not, and would otherwise receive opaque gzip bytes.
+        if "gzip" in (request.headers.get("accept-encoding") or "").lower():
+            compressed = compress(payload, compresslevel=settings.gzip_level)
+            headers["Content-Encoding"] = "gzip"
+            headers["Content-Length"] = str(len(compressed))
+            return Response(content=compressed, media_type=media_type, headers=headers)
+
+        headers["Content-Length"] = str(len(payload))
+        return Response(content=payload, media_type=media_type, headers=headers)
 
     def authenticate(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
         if credentials is None:
@@ -96,38 +129,22 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
     # Fetch tile data from a given dataset at selected level and tile coordinates
     # Importantly level zero == lowest detail (smallest total size)
     @app.get("/data/{identifier}/level/{level}/tile/{tile_x}/{tile_y}/balanced/{balanced}")
-    def get_dataset_tile(identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False, group=Depends(authenticate)):        
+    def get_dataset_tile(request: Request, identifier: str, level: int, tile_x: int, tile_y: int, balanced: bool, test=False, group=Depends(authenticate)):
         dataset = data_manager.get_dataset(identifier, group)
         tile = dataset.get_tile(level, tile_x, tile_y, balanced)
-        print(tile)
+        #print(tile)
         if test:
             return {"matrix": tile.tolist()}
-        compressed = compress(tile.tobytes())
-        return Response(
-            content=compressed,
-            media_type="application/octet-stream",
-            headers={
-                "Content-Encoding": "gzip",
-                "Content-Length": str(len(compressed)),
-            }
-        )
+        return matrix_response(tile, request)
     
     @app.get("/data/{identifier}/level/{level}/xregion/{start_x}/{end_x}/yregion/{start_y}/{end_y}/balanced/{balanced}")
-    def get_dataset_section(identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, balanced: bool, test=False, group=Depends(authenticate)):
+    def get_dataset_section(request: Request, identifier: str, level: int, start_x: int, end_x: int, start_y: int, end_y: int, balanced: bool, test=False, group=Depends(authenticate)):
         dataset = data_manager.get_dataset(identifier, group)
         tile = dataset.get_region_pos(level, start_x, end_x, start_y, end_y, balanced)
-        print(tile)
+        #print(tile)
         if test:
             return {"matrix": tile.tolist()}
-        compressed = compress(tile.tobytes())
-        return Response(
-            content=compressed,
-            media_type="application/octet-stream",
-            headers={
-                "Content-Encoding": "gzip",
-                "Content-Length": str(len(compressed)),
-            }
-        )
+        return matrix_response(tile, request)
     
     @app.get("/chromosomes/{identifier}")
     def fetch_chromosome_annotations(identifier: str, level: int = 0, round: bool = False, group=Depends(authenticate)):
@@ -146,7 +163,7 @@ def create_api(app, settings: Settings, data_manager: DataManager, storage_manag
         return result
 
     @app.get("/graph/{identifier}/level/{level}/type/{type}/position/{start}/{end}/balanced/{balanced}")
-    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: int = 3, group=Depends(authenticate)):
+    def calculate_graph_layout(identifier: str, level: int, type: str, start: int, end: int, balanced: bool, infer_distances: bool=True, freq_filter: float=0, dist_filter: float = -1, close_weight: float = 3, group=Depends(authenticate)):
         dataset = data_manager.get_dataset(identifier, group)
         if settings.use_storage and storage_manager.graph_exists(identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight):
             return storage_manager.load_graph(identifier, level, type, start, end, balanced, infer_distances, freq_filter, dist_filter, close_weight)
